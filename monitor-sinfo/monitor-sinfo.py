@@ -501,7 +501,17 @@ def main_loop(
         nodes = sinfo
 
 
-def parse_args(argv: list[str]) -> argparse.Namespace:
+@dataclass
+class Args:
+    config: Path
+    sinfo: str
+    interval: float
+    verbose: bool
+    dry_run: bool
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+
+
+def parse_args(argv: list[str]) -> Args:
     parser = argparse.ArgumentParser(
         formatter_class=functools.partial(
             argparse.ArgumentDefaultsHelpFormatter,
@@ -532,8 +542,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Log updates that would be sent instead of sending them",
     )
+    parser.add_argument(
+        "--log-level",
+        type=str.upper,
+        choices=("DEBUG", "INFO", "WARNING", "ERROR"),
+        help="Verbosity level for console logging",
+    )
 
-    return parser.parse_args(argv)
+    return Args(**vars(parser.parse_args(argv)))
 
 
 def main(argv: list[str]) -> int:
@@ -542,7 +558,7 @@ def main(argv: list[str]) -> int:
 
     coloredlogs.install(
         fmt="%(asctime)s %(levelname)s %(message)s",
-        level=logging.DEBUG,
+        level=args.log_level,
     )
 
     _info("Loading TOML config from %r", str(args.config))
