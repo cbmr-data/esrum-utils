@@ -284,12 +284,10 @@ class SlackNotifier(Notifier):
 
                 if change in (ChangeType.Available, ChangeType.Added):
                     item.add_element("emoji", text="green_heart")
-                    item.add_text(" Node ")
+                    item.add_text(" ")
                 elif change in (ChangeType.Unavailable, ChangeType.Removed):
                     item.add_element("emoji", text="broken_heart")
-                    item.add_text(" Node ")
-                else:
-                    item.add_text("Node ")
+                    item.add_text(" ")
 
                 item.add_text(key, bold=True)
                 if change in (ChangeType.Added, ChangeType.Removed):
