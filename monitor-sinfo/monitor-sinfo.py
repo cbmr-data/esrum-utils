@@ -408,41 +408,14 @@ class Config:
     @staticmethod
     def load(filepath: Path) -> Config:
         with filepath.open("rb") as handle:
-            toml: Any = tomli.load(handle)
+            toml: object = tomli.load(handle)
 
-        smtp_server = toml.get("smtp-server")
-        if not isinstance(smtp_server, str):
-            _error("`smtp-server` not set/not a string in TOML file")
-            sys.exit(1)
+        validator = DataclassValidator(Config)
+        result = validator(toml)
+        if not isinstance(result, Valid):
+            abort("Error parsing TOML file: %s", result.err_type)
 
-        emails = Config._get(toml, "email-recipients")
-        slack = Config._get(toml, "slack-webhooks")
-
-        return Config(
-            smtp_server=smtp_server,
-            email_recipients=emails,
-            slack_webhooks=slack,
-        )
-
-    @staticmethod
-    def _get(toml: dict[str, Any], key: str) -> list[str]:
-        values: Any = toml.get(key)
-        if values is None:
-            _warning("Key %r not specified in toml file", key)
-            return []
-
-        if isinstance(values, str):
-            return [values]
-        elif not isinstance(values, list):
-            _error("%r in toml file is not a string or a list", key)
-            sys.exit(1)
-
-        for value in cast(list[object], values):
-            if not isinstance(value, str):
-                _error("Value %r for key %r in toml file is not a string", value, key)
-                sys.exit(1)
-
-        return cast(list[str], values)
+        return result.val
 
 
 def collect_node_status(sinfo: str) -> dict[str, Status] | None:
