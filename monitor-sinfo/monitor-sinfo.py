@@ -375,13 +375,18 @@ class SlackNotifier(Notifier):
         any_errors = False
         for url in self._webhooks:
             _debug("Sending blocks to slack at %r", url)
-            result = requests.post(
-                url,
-                data=json.dumps(data),
-                headers={
-                    "content-type": "application/json",
-                },
-            )
+            try:
+                result = requests.post(
+                    url,
+                    data=json.dumps(data),
+                    headers={
+                        "content-type": "application/json",
+                    },
+                )
+            except requests.exceptions.RequestException as error:
+                _error("Request to slack webhook %r failed: %s", url, error)
+                any_errors = True
+                continue
 
             if result.status_code != 200:
                 _error(
@@ -442,13 +447,17 @@ class Config:
 
 def collect_node_status(sinfo: str) -> dict[str, Status] | None:
     _debug("Running sinfo")
-    proc = subprocess.run(
-        [sinfo, "--Node", "--format=%N|%t|%E"],
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        check=False,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [sinfo, "--Node", "--format=%N|%t|%E"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+    except OSError as error:
+        _error("Error collecting node states: %s", error)
+        return None
 
     if proc.returncode:
         _error("sinfo exited with code %i: %s", proc.returncode, proc.stderr)
