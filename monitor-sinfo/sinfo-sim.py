@@ -157,8 +157,10 @@ def main(argv: list[str]) -> int:
 
     print("NODELIST|STATE|REASON")
     for node in nodes:
-        node.state = random_state(node.state)
-        node.reason = "none" if node.state == "idle" else random_reason()
+        new_state = random_state(node.state)
+        if new_state != node.state:
+            node.state = new_state
+            node.reason = "none" if node.state == "idle" else random_reason()
 
         print(node.name, node.state, node.reason, sep="|")
 
