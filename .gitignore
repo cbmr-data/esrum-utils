@@ -98,3 +98,6 @@ dmypy.json
 *.swp
 *.tmp
 *~
+
+# Editors
+.vscode
