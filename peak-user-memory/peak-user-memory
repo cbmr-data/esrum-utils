@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+# pyright: strict
+from __future__ import annotations
+
+import argparse
+import functools
+import pwd
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from socket import gethostname
+
+
+@dataclass
+class Process:
+    uid: int
+    user: str
+    pid: int
+    mem: float
+    name: str
+
+
+def get_username(uid: int) -> str | None:
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return None
+
+
+def read_proc_status(proc: Path) -> Process | None:
+    try:
+        text = (proc / "status").read_text()
+    except OSError:
+        return None
+
+    status: dict[str, str] = {}
+    for line in text.splitlines():
+        key, value = line.split(":", 1)
+        status[key.strip()] = value.strip()
+
+    try:
+        name = status["Name"]
+
+        _real, effective, _saved, _fs = status["Uid"].split()
+        uid = int(effective)
+        username = get_username(uid) or "effective"
+
+        peak, unit = status["VmPeak"].split()
+        assert unit == "kB", unit
+        peak_mem = float(peak) / 1024 / 1024
+    except KeyError:
+        return None
+
+    return Process(
+        uid=uid,
+        user=username,
+        pid=int(proc.name),
+        name=name,
+        mem=peak_mem,
+    )
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        formatter_class=functools.partial(
+            argparse.ArgumentDefaultsHelpFormatter,
+            width=79,
+        ),
+        allow_abbrev=False,
+    )
+
+    parser.add_argument("users", nargs="*", type=Path)
+    parser.add_argument(
+        "--min-peak-vm",
+        metavar="GB",
+        type=float,
+        default=1.0,
+        help="List processes where the peak VM usage is at least N GB",
+    )
+    parser.add_argument(
+        "--min-uid",
+        metavar="UID",
+        type=int,
+        default=1000,
+        help="Ignore users with an UID less than this value; defaults to "
+        "excluding system processes",
+    )
+
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str]) -> int:
+    args = parse_args(argv)
+    hostname = gethostname()
+    if hostname.endswith(".unicph.domain"):
+        hostname = hostname[:-14]
+
+    print("Hostname", "User", "PeakVM", "PID", "Process", sep="\t")
+    for it in Path("/proc").iterdir():
+        if it.name.isdigit():
+            proc = read_proc_status(it)
+            if (
+                proc is not None
+                and proc.mem >= args.min_peak_vm
+                and proc.uid >= args.min_uid
+            ):
+                print(
+                    hostname,
+                    proc.user,
+                    f"{proc.mem:.1f}",
+                    proc.pid,
+                    proc.name,
+                    sep="\t",
+                )
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
