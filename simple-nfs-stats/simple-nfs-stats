@@ -1,0 +1,361 @@
+#!/usr/bin/env python3.11
+#
+# This script is based on parsing code from nfs-utils mountstats.py
+# https://github.com/stefanha/nfs-utils/blob/vsock/tools/mountstats/mountstats.py
+#
+# Copyright (C) 2024, Mikkel Schubert
+# Copyright (C) 2005, Chuck Lever <cel@netapp.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA 02110-1301 USA
+#
+from __future__ import annotations
+
+import argparse
+import datetime
+import sys
+import time
+from itertools import zip_longest
+from operator import itemgetter
+from pathlib import Path
+from typing import Iterator, NamedTuple
+
+__VERSION__ = "0.0.1"
+
+NfsByteCounters = [
+    "normalreadbytes",
+    "normalwritebytes",
+    "directreadbytes",
+    "directwritebytes",
+    "serverreadbytes",
+    "serverwritebytes",
+    "readpages",
+    "writepages",
+]
+
+
+def bytes_to_megabytes(value: float) -> str:
+    value /= 1024 * 1024
+
+    if value == 0:
+        return "0"
+    elif value <= 0.01:
+        # Round up if rate is non-zero but would print as "0.00"
+        return "0.01"
+    elif value < 10:
+        return f"{value:.2f}"  # 1.23
+    elif value < 100:
+        return f"{value:.1f}"  # 12.2
+
+    return f"{value:.0f}"  # 123
+
+
+def human_ops_time(ms: float, ops: int) -> str:
+    if ops == 0:
+        return "0"
+
+    duration = (ms / ops) if ms > 0.0 else 0.0
+    if 0 < duration <= 0.1:
+        # Round up if duration is non-zero but would print as "0.0"
+        return "0.1"
+
+    return f"{duration:.1f}"
+
+
+def timestamp() -> datetime.datetime:
+    return datetime.datetime.now().replace(microsecond=0)
+
+
+class Snapshot(NamedTuple):
+    mountpoints: dict[str, str]
+
+    age: int = 0
+
+    read_total: int = 0
+    read_total_ops: int = 0
+    read_total_time: int = 0
+
+    write_total: int = 0
+    write_total_ops: int = 0
+    write_total_time: int = 0
+
+
+class DeviceData:
+    """DeviceData objects provide methods for parsing and displaying
+    data for a single mount grabbed from /proc/self/mountstats
+    """
+
+    mountpoints: dict[str, str]
+
+    def __init__(self, lines):
+        self.nfs_data = {}
+        self.rpc_data = {"ops": []}
+        self.mountpoints = {}
+        self._parse_stats(lines)
+
+    def _parse_nfs_line(self, words):
+        if words[0] == "device":
+            self.mountpoints[words[4]] = words[1]
+            self.nfs_data["fstype"] = words[7]
+            if words[7].find("nfs") != -1 and words[7] != "nfsd":
+                self.nfs_data["statvers"] = words[8]
+        elif "nfs" in words or "nfs4" in words:
+            self.mountpoints[words[4]] = words[1]
+            self.nfs_data["fstype"] = words[6]
+            if words[6].find("nfs") != -1 and words[6] != "nfsd":
+                self.nfs_data["statvers"] = words[7]
+        elif words[0] == "age:":
+            self.nfs_data["age"] = int(words[1])
+        elif words[0] == "bytes:":
+            for i, key in enumerate(NfsByteCounters, start=1):
+                self.nfs_data[key] = int(words[i])
+
+    def _parse_rpc_line(self, words):
+        if words[0] not in ("RPC", "xprt:", "per-op"):
+            op = words[0][:-1]
+            self.rpc_data["ops"].append(op)
+            self.rpc_data[op] = [int(word) for word in words[1:]]
+
+    def _parse_stats(self, lines):
+        """Turn a list of lines from a mount stat file into a
+        dictionary full of stats, keyed by name
+        """
+        found = False
+        for line in lines:
+            words = line.split()
+            if words:
+                if not found and words[0] != "RPC":
+                    self._parse_nfs_line(words)
+                    continue
+
+                found = True
+                self._parse_rpc_line(words)
+
+    @property
+    def age(self) -> int:
+        return self.nfs_data["age"]
+
+    @property
+    def server_read_bytes(self) -> int:
+        return self.nfs_data["serverreadbytes"]
+
+    @property
+    def server_write_bytes(self) -> int:
+        return self.nfs_data["serverwritebytes"]
+
+    def operation_count(self, op: str) -> int:
+        return self.rpc_data[op][0]
+
+    def cumulative_request_time(self, op) -> int:
+        return self.rpc_data[op][7]
+
+    def is_nfs_mountpoint(self):
+        return self.nfs_data["fstype"] in ("nfs", "nfs4")
+
+    def same_properties(self, other: DeviceData) -> bool:
+        return self.nfs_data == other.nfs_data and self.rpc_data == other.rpc_data
+
+
+def parse_proc() -> list[Snapshot]:
+    blocks: list[list[str]] = []
+    with Path("/proc/self/mountstats").open() as handle:
+        for line in handle:
+            if words := line.split():
+                if words[0] == "device":
+                    blocks.append([line.strip()])
+                elif "nfs" in words or "nfs4" in words:
+                    blocks.append([line.strip()])
+                else:
+                    blocks[-1].append(line.strip())
+
+    devices: dict[int, list[DeviceData]] = {}
+    for lines in blocks:
+        stats = DeviceData(lines)
+        if stats.is_nfs_mountpoint():
+            # Merge shared mount-points
+            for device in devices.setdefault(stats.age, []):
+                if device.same_properties(stats):
+                    device.mountpoints.update(stats.mountpoints)
+                    break
+            else:
+                devices[stats.age].append(stats)
+
+    snapshots: list[Snapshot] = []
+    for values in devices.values():
+        for stats in values:
+            ss = Snapshot(
+                mountpoints=stats.mountpoints,
+                age=stats.age,
+                read_total=stats.server_read_bytes,
+                read_total_ops=stats.operation_count("READ"),
+                read_total_time=stats.cumulative_request_time("READ"),
+                write_total=stats.server_write_bytes,
+                write_total_ops=stats.operation_count("WRITE"),
+                write_total_time=stats.cumulative_request_time("WRITE"),
+            )
+
+            snapshots.append(ss)
+
+    return snapshots
+
+
+def print_rows(rows: list[list[str]], *, indent: list[int] | None = None) -> None:
+    if indent is not None:
+        for row in rows:
+            lens = [len(value) for value in row]
+            indent[:] = [max(a, b) for a, b in zip_longest(lens, indent, fillvalue=0)]
+
+        for row in rows:
+            print(
+                *(
+                    value.ljust(width + 4)
+                    for width, value in zip(indent, row, strict=True)
+                ),
+                sep="",
+            )
+    else:
+        for row in rows:
+            print(*row, sep="\t")
+
+    sys.stdout.flush()
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version="mountstats " + __VERSION__,
+    )
+    parser.add_argument(
+        "--interval",
+        metavar="S",
+        default=5.0,
+        type=float,
+        help="Refresh every S seconds",
+    )
+    parser.add_argument(
+        "--wipe",
+        action="store_true",
+        help="Clear the screen before updates and (re)print the header",
+    )
+    parser.add_argument(
+        "--min-ops-time",
+        metavar="MS",
+        type=float,
+        default=0.0,
+        help="Do not print updates if the average ops time for both reads and writes "
+        "is less than MS miliseconds",
+    )
+
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str]) -> int:
+    args = parse_args(argv)
+    isatty = sys.stdout.isatty()
+    indent = [19, 19] if isatty else None
+
+    header = [
+        "Start",
+        "End",
+        "ReadMiBpS",
+        "ReadOpsTime",
+        "WriteMiBpS",
+        "WriteOpsTime",
+        "MountPoints",
+    ]
+
+    if isatty:
+        print("\033c")
+        print("Initializing...")
+
+    prev_timestamp = timestamp()
+    snapshots = parse_proc()
+    missing = Snapshot(mountpoints={"NA": "NA"})
+    time.sleep(args.interval)
+
+    first_loop = True
+    while True:
+        rows: list[list[str]] = []
+        if args.wipe or first_loop:
+            first_loop = False
+            if isatty:
+                print("\033c")
+            rows.append(list(header))
+
+        curr_timestamp = timestamp()
+        curr_timedelta = (curr_timestamp - prev_timestamp).total_seconds()
+
+        current = parse_proc()
+        for curr_stats in current:
+            for prev_stats in snapshots:
+                # NFS are assumed to be the same if they share any mount-points
+                if prev_stats.mountpoints.keys() & curr_stats.mountpoints.keys():
+                    if prev_stats.age > curr_stats.age:
+                        # Drive re-mounted since last loop
+                        prev_stats = missing
+
+                    break
+            else:
+                prev_stats = missing
+
+            key = ";".join(sorted(curr_stats.mountpoints))
+
+            curr_read_time = curr_stats.read_total_time - prev_stats.read_total_time
+            curr_write_time = curr_stats.write_total_time - prev_stats.write_total_time
+            if curr_read_time < 0 or curr_write_time < 0:
+                print(f"WARNING: Misidentified mount point {key!r}", file=sys.stderr)
+                continue
+
+            curr_read = curr_stats.read_total - prev_stats.read_total
+            curr_write = curr_stats.write_total - prev_stats.write_total
+
+            curr_read_ops = curr_stats.read_total_ops - prev_stats.read_total_ops
+            curr_write_ops = curr_stats.write_total_ops - prev_stats.write_total_ops
+
+            if (
+                args.min_ops_time > 0
+                and max(
+                    curr_read_time / (curr_read_ops or 1),
+                    curr_write_time / (curr_write_ops or 1),
+                )
+                < args.min_ops_time
+            ):
+                continue
+
+            if curr_read_ops or curr_write_ops:
+                row: dict[str, str] = {
+                    "Start": prev_timestamp.isoformat(),
+                    "End": curr_timestamp.isoformat(),
+                    "ReadOpsTime": human_ops_time(curr_read_time, curr_read_ops),
+                    "ReadMiBpS": bytes_to_megabytes(curr_read / curr_timedelta),
+                    "WriteOpsTime": human_ops_time(curr_write_time, curr_write_ops),
+                    "WriteMiBpS": bytes_to_megabytes(curr_write / curr_timedelta),
+                    "MountPoints": key,
+                }
+
+                rows.append([row[key] for key in header])
+
+        print_rows(rows, indent=indent)
+        time.sleep(args.interval)
+        snapshots = current
+        prev_timestamp = curr_timestamp
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
