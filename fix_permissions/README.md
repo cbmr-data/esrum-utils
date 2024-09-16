@@ -4,10 +4,12 @@ This script fixes/cleans up permissions for data that is intended to be shared w
 
 More specifically, by default the script
 
- - Updates group ownership of files/folders/links to that specified on the command-line
- - Sets the group-bit (S_ISGID) on folders, so that new files inherit their group from the parent folder
- - Ensures that only the owner has write access
- - Ensures that only the owner and group has read access
+ - Ensures that all files/folders have the same group ownership
+ - Ensures that the owner and group has read access (optional and optionally other)
+   - For folders this includes setting the executable bit
+ - Inherits group and other permissions from owner permissions
+   - Ensures that only the owner has write access (optionally group)
+ - Sets the group-bit (S_ISGID) on folders, so that new files inherit their group from the parent folder (optional)
 
 Note that symlinks are not followed.
 

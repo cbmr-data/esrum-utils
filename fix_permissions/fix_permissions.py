@@ -88,6 +88,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="One or more paths for which group-ownership/permissions are to be fixed",
     )
     parser.add_argument(
+        "--ignore-missing-permissions",
+        action="store_true",
+        help="By default this script will ensure that files are readable and that "
+        "folders are readable and executable, for both the owner and group. Use this "
+        "to disable setting this permissions",
+    )
+    parser.add_argument(
         "--no-group-bit",
         action="store_true",
         help="Do not set S_ISGID for folders; S_ISGID ensures that new files inherit "
@@ -142,6 +149,9 @@ def main(argv: list[str]) -> int:
     gid = get_group_id(args.group)
     uid = os.getuid()
 
+    min_file_premissions = 0 if args.ignore_missing_permissions else 0o440
+    min_folder_premissions = 0 if args.ignore_missing_permissions else 0o550
+
     group_mask = 0o070 if args.group_writable else 0o050
     other_mask = 0o005 if args.other else 0o000
 
@@ -171,12 +181,16 @@ def main(argv: list[str]) -> int:
             mode = owner_mode | group_mode | other_mode | misc
 
             if direntry.is_dir():
+                mode |= min_folder_premissions
+
                 if args.no_group_bit:
                     # Inherit S_ISGID
                     mode = mode | (stats.st_mode & stat.S_ISGID)
                 else:
                     # Ensure that group IDs of files are inheritied from dirs
                     mode = mode | stat.S_ISGID
+            else:
+                mode |= min_file_premissions
 
             if stats.st_mode & 0o7777 != mode:
                 if not args.quiet:
