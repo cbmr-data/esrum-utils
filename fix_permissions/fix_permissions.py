@@ -181,11 +181,8 @@ def main(argv: list[str]) -> int:
             if stats.st_mode & 0o7777 != mode:
                 if not args.quiet:
                     print(
-                        "chmod {} to {} since mode is {}".format(
-                            quote(filepath),
-                            oct(mode),
-                            oct(stats.st_mode & 0o7777),
-                        )
+                        f"chmod {quote(filepath)} to {mode:03o} since mode is "
+                        f"{stats.st_mode & 0o7777:03o}"
                     )
 
                 if args.commit:
