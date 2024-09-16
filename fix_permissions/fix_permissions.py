@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
+import functools
 import grp
 import os
 import pwd
@@ -7,9 +10,12 @@ import shlex
 import stat
 import sys
 from pathlib import Path
+from typing import Iterable, NoReturn, TypeVar
+
+T = TypeVar("T")
 
 
-def tqdm(seq):
+def tqdm(seq: Iterable[T]) -> Iterable[T]:
     if sys.stderr.isatty():
         try:
             import tqdm
@@ -21,16 +27,16 @@ def tqdm(seq):
     return seq
 
 
-def warning(*args, file=sys.stderr, **kwargs):
-    print("WARNING:", *args, file=file, **kwargs)
+def warning(*args: object) -> None:
+    print("WARNING:", *args, file=sys.stderr)
 
 
-def abort(*args, file=sys.stderr, **kwargs):
-    print("ERROR:", *args, file=file, **kwargs)
+def abort(*args: object) -> NoReturn:
+    print("ERROR:", *args, file=sys.stderr)
     sys.exit(1)
 
 
-def quote(value):
+def quote(value: object) -> str:
     return shlex.quote(str(value))
 
 
@@ -43,30 +49,27 @@ def get_group_id(name: str) -> int:
     return groupinfo.gr_gid
 
 
-def get_group_name(id: int) -> str:
+def get_group_name(gid: int) -> str:
     try:
-        return grp.getgrgid(id).gr_name
+        return grp.getgrgid(gid).gr_name
     except KeyError:
-        return str(id)
+        return str(gid)
 
 
-def get_user_name(id: int) -> str:
+def get_user_name(uid: int) -> str:
     try:
-        return pwd.getpwuid(id).pw_name
+        return pwd.getpwuid(uid).pw_name
     except KeyError:
-        return str(id)
+        return str(uid)
 
 
-class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault("width", 79)
-
-        super().__init__(*args, **kwargs)
-
-
-def parse_args(argv):
+def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        formatter_class=HelpFormatter,
+        formatter_class=functools.partial(
+            argparse.ArgumentDefaultsHelpFormatter,
+            width=79,
+        ),
+        allow_abbrev=False,
         description="""This script is used to fix permissions and group ownership so
         only the owner has write access (if already set), and so that "group" members
         and "others" only have read-access. This corresponds to the default permissions
@@ -115,23 +118,25 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
-def walk(*roots):
+def walk(
+    *roots: os.DirEntry[str] | Path,
+) -> Iterable[tuple[Path, Path | os.DirEntry[str], os.stat_result]]:
     queue = list(roots)
     while queue:
         root = queue.pop()
         if isinstance(root, os.DirEntry):
-            yield root.path, root, root.stat(follow_symlinks=False)
+            yield Path(root), root, root.stat(follow_symlinks=False)
         else:
-            yield root, Path(root), os.lstat(root)
+            yield root, root, os.lstat(root)
 
         for it in os.scandir(root):
             if it.is_dir(follow_symlinks=False):
                 yield from walk(it)
             else:
-                yield it.path, it, it.stat(follow_symlinks=False)
+                yield Path(it), it, it.stat(follow_symlinks=False)
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     args = parse_args(argv)
 
     gid = get_group_id(args.group)
@@ -184,7 +189,7 @@ def main(argv):
                     )
 
                 if args.commit:
-                    os.chmod(filepath, mode)
+                    filepath.chmod(mode)
 
     if not args.commit:
         print("Run with --commit to apply changes")
