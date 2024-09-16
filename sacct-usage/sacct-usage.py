@@ -1,5 +1,7 @@
 #!/opt/software/python/3.11.3/bin/python3
 # pyright: strict
+from __future__ import annotations
+
 import argparse
 import contextlib
 import datetime
@@ -11,7 +13,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from itertools import zip_longest
-from typing import IO, Any, Callable, Dict, List, NoReturn, Optional, Sequence, Union
+from typing import IO, Any, Callable, NoReturn, Sequence
 
 # MB of memory allocated per CPU by default; see DefMemPerCPU in /etc/slurm/slurm.conf
 _DEFAULT_MEM_PER_CPU = 15948
@@ -101,9 +103,9 @@ def format_h(hours: float) -> str:
 
 
 def print_table(
-    table: List[List[str]],
+    table: list[list[str]],
     is_numerical: Sequence[bool] = (),
-    column_separator: Optional[str] = None,
+    column_separator: str | None = None,
     out: IO[str] = sys.stdout,
 ) -> None:
     if column_separator is None or column_separator.lower() in ("space", "spaces"):
@@ -111,13 +113,13 @@ def print_table(
         widths = []
         for row in table:
             widths = [
-                max(width, len(it))
+                max(width, 0 if isinstance(it, int) else len(it))
                 for width, it in zip_longest(widths, row, fillvalue=0)
             ]
 
-        padded_table: List[List[str]] = []
+        padded_table: list[list[str]] = []
         for row in table:
-            result: List[str] = []
+            result: list[str] = []
             for idx, (width, value) in enumerate(zip(widths, row)):
                 if is_numerical and is_numerical[idx]:
                     result.append(value.rjust(width))
@@ -158,7 +160,7 @@ class Usage:
         return not math.isnan(self.cpu_total)
 
     @property
-    def cpu_utilization(self):
+    def cpu_utilization(self) -> float:
         if self.elapsed > 0:
             return min(1.0, (self.cpu_total / self.elapsed) / self.cpus)
 
@@ -169,7 +171,7 @@ class Usage:
         return max(0, self.mem - self.mem_default)
 
     @property
-    def extra_mem_utilization(self):
+    def extra_mem_utilization(self) -> float:
         extra_mem = self.extra_mem
         if extra_mem:
             return max(0, self.mem - max(self.mem_total, extra_mem)) / extra_mem
@@ -177,10 +179,10 @@ class Usage:
         return 1.0
 
 
-def parse_usage(text: str, args: argparse.Namespace) -> List[Usage]:
+def parse_usage(text: str) -> list[Usage]:
     now = datetime.datetime.now()
 
-    jobs: Dict[str, Usage] = {}
+    jobs: dict[str, Usage] = {}
     lines = text.split("\n")
     header = lines[0].rstrip().split("|")
     for line in lines[1:]:
@@ -236,8 +238,8 @@ def parse_usage(text: str, args: argparse.Namespace) -> List[Usage]:
 
 
 def sort_table(
-    table: List[Dict[str, Union[str, int, float]]],
-    columns: List[str],
+    table: list[dict[str, str | int | float]],
+    columns: list[str],
     sort_key: str,
 ) -> None:
     sort_key = sort_key.strip()
@@ -294,7 +296,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--min-cpus",
         metavar="N",
         default=2,
-        help="Ignore jobs with less than this number of CPUs, regardless of utilization",
+        help="Ignore jobs with less than this number of CPUs, regardless of "
+        "utilization",
     )
     parser.add_argument(
         "--min-cpu-utilization",
@@ -361,7 +364,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         dest="end_time",
         help="Show tasks ending at this time; see `man sacct` for format",
     )
-    # TODO: Impl
     parser.add_argument(
         "-T",
         "--truncate",
@@ -389,7 +391,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     args = parse_args(argv)
     if len(args.column_separator) != 1 and args.column_separator not in (
         "tab",
@@ -440,8 +442,8 @@ def main(argv: List[str]) -> int:
     if proc.returncode:
         return proc.returncode
 
-    rows: List[Dict[str, Union[str, int, float]]] = []
-    for it in parse_usage(stdout, args=args):
+    rows: list[dict[str, str | int | float]] = []
+    for it in parse_usage(stdout):
         if (it.state in _STATE_WHITELIST) and (
             not args.filter
             or args.jobs is not None
@@ -493,14 +495,14 @@ def main(argv: List[str]) -> int:
                 }
             )
 
-    verbose_columns: Dict[str, Union[str, Callable[[Any], str]]] = {}
+    verbose_columns: dict[str, str | Callable[[Any], str]] = {}
     if args.verbose:
         verbose_columns = {
             "Mem": "{:.1f}",
             "MemWasted": "{:.1f}",
         }
 
-    columns: Dict[str, Union[str, Callable[[Any], str]]] = {
+    columns: dict[str, str | Callable[[Any], str]] = {
         "Age": format_h,
         "User": "{}",
         "Job": "{}",
@@ -520,10 +522,10 @@ def main(argv: List[str]) -> int:
         sort_key=args.sort_key,
     )
 
-    table: List[List[str]] = [list(columns)]
+    table: list[list[str]] = [list(columns)]
     is_numerical = [True] * len(columns)
     for row in rows:
-        values: List[str] = []
+        values: list[str] = []
         for idx, (key, formatter) in enumerate(columns.items()):
             value = row[key]
 
