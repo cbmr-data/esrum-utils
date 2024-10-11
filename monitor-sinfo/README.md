@@ -24,12 +24,12 @@ smtp-server = "smtp.example.com"
 
 # Zero or more email addresses
 email-recipients = [
-	"abc123@sund.ku.dk",
+    "abc123@sund.ku.dk",
 ]
 
 # Zero or more webhooks
 slack-webhooks = [
-	"https://hooks.slack.com/services/etc",
+    "https://hooks.slack.com/services/etc",
 ]
 ```
 

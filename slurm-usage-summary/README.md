@@ -4,7 +4,6 @@ This script queries `sacct` for job information and print either a summary of th
 
 ```console
 $ python3 slurm-usage-summary.py summary users_and_groups.tsv | column -t
-00.tsv | head|column -t
 Year  Month  Group   Users  Jobs   CPUNodeHours  GPUNodeHours
 2023  12     Group2  3      3399   3316.5        0.0
 2023  12     Group1  5      2385   11349.8       7.2
