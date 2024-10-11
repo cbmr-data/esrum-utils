@@ -279,8 +279,9 @@ class SlackBlock:
 
 
 class SlackNotifier(Notifier):
-    def __init__(self, *, webhooks: list[str], verbose: bool) -> None:
+    def __init__(self, *, webhooks: list[str], timeout: float, verbose: bool) -> None:
         self._webhooks = list(webhooks)
+        self._timeout = timeout
         self._verbose = verbose
 
     @override
@@ -383,6 +384,7 @@ class SlackNotifier(Notifier):
                     headers={
                         "content-type": "application/json",
                     },
+                    timeout=self._timeout,
                 )
             except requests.exceptions.RequestException as error:
                 _error("Request to slack webhook %r failed: %s", url, error)
@@ -520,9 +522,9 @@ def setup_logging(args: Args) -> None:
     )
 
 
-def setup_notifications(*, config_file: Path, verbose: bool) -> list[Notifier]:
-    _info("Loading TOML config from %r", str(config_file))
-    config = Config.load(config_file)
+def setup_notifications(args: Args) -> list[Notifier]:
+    _info("Loading TOML config from %r", str(args.config))
+    config = Config.load(args.config)
 
     notifiers: list[Notifier] = [LogNotifier()]
     if config.email_recipients:
@@ -531,7 +533,7 @@ def setup_notifications(*, config_file: Path, verbose: bool) -> list[Notifier]:
             EmailNotifier(
                 smtpserver=config.smtp_server,
                 recipients=config.email_recipients,
-                verbose=verbose,
+                verbose=args.verbose,
             )
         )
 
@@ -540,7 +542,8 @@ def setup_notifications(*, config_file: Path, verbose: bool) -> list[Notifier]:
         notifiers.append(
             SlackNotifier(
                 webhooks=config.slack_webhooks,
-                verbose=verbose,
+                timeout=args.slack_timeout,
+                verbose=args.verbose,
             )
         )
 
@@ -556,6 +559,7 @@ class Args:
     dry_run: bool
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"]
     loop: int | None
+    slack_timeout: float
 
 
 def parse_args(argv: list[str]) -> Args:
@@ -601,6 +605,13 @@ def parse_args(argv: list[str]) -> Args:
         help="Verbosity level for console logging",
     )
     parser.add_argument(
+        "--slack-timeout",
+        metavar="S",
+        type=float,
+        default=30.0,
+        help="Timeout used for POST requests to Slack API end-points",
+    )
+    parser.add_argument(
         "--loop",
         metavar="S",
         type=float,
@@ -614,7 +625,7 @@ def main(argv: list[str]) -> int:
     args = parse_args(argv)
 
     setup_logging(args)
-    notifiers = setup_notifications(config_file=args.config, verbose=args.verbose)
+    notifiers = setup_notifications(args)
     prev_states = load_node_status(args.state)
 
     while True:
