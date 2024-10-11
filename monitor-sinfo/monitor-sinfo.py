@@ -8,6 +8,7 @@ import json
 import logging
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -554,6 +555,7 @@ class Args:
     verbose: bool
     dry_run: bool
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+    loop: int | None
 
 
 def parse_args(argv: list[str]) -> Args:
@@ -598,6 +600,12 @@ def parse_args(argv: list[str]) -> Args:
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
         help="Verbosity level for console logging",
     )
+    parser.add_argument(
+        "--loop",
+        metavar="S",
+        type=float,
+        help="Check for updates every S seconds, instead of exiting immediately",
+    )
 
     return Args(**vars(parser.parse_args(argv)))
 
@@ -608,25 +616,33 @@ def main(argv: list[str]) -> int:
     setup_logging(args)
     notifiers = setup_notifications(config_file=args.config, verbose=args.verbose)
     prev_states = load_node_status(args.state)
-    curr_states = collect_node_status(args.sinfo)
-    if curr_states is None:
-        abort("Could not collect node status; aborting")
 
-    if prev_states is None:
-        save_node_status(filepath=args.state, nodes=curr_states)
+    while True:
+        curr_states = collect_node_status(args.sinfo)
+        if curr_states is None:
+            abort("Could not collect node status; aborting")
+
+        if prev_states is None:
+            save_node_status(filepath=args.state, nodes=curr_states)
+            prev_states = curr_states
+
+        if prev_states != curr_states:
+            save_node_status(filepath=args.state, nodes=curr_states)
+
+        updates = diff_node_states(prev_states=prev_states, curr_states=curr_states)
+        if updates:
+            for notifier in notifiers:
+                notifier.send_notification(
+                    nodes=curr_states,
+                    updates=updates,
+                    dry_run=args.dry_run,
+                )
+
+        if args.loop is None:
+            break
+
         prev_states = curr_states
-
-    if prev_states != curr_states:
-        save_node_status(filepath=args.state, nodes=curr_states)
-
-    updates = diff_node_states(prev_states=prev_states, curr_states=curr_states)
-    if updates:
-        for notifier in notifiers:
-            notifier.send_notification(
-                nodes=curr_states,
-                updates=updates,
-                dry_run=args.dry_run,
-            )
+        time.sleep(args.loop)
 
     return 0
 
