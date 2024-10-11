@@ -653,7 +653,11 @@ def main(argv: list[str]) -> int:
             break
 
         prev_states = curr_states
-        time.sleep(args.loop)
+        try:
+            time.sleep(args.loop)
+        except KeyboardInterrupt:
+            _info("Interrupt detected; ending loop")
+            break
 
     return 0
 
