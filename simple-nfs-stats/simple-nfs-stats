@@ -213,15 +213,15 @@ def parse_proc() -> list[Snapshot]:
 def print_rows(rows: list[list[str]], *, indent: list[int] | None = None) -> None:
     if indent is not None:
         for row in rows:
-            lens = [len(value) for value in row]
+            lens = [len(value) + 4 for value in row]
             indent[:] = [max(a, b) for a, b in zip_longest(lens, indent, fillvalue=0)]
+
+        # Avoid trailing whitespace
+        indent[-1] = 0
 
         for row in rows:
             print(
-                *(
-                    value.ljust(width + 4)
-                    for width, value in zip(indent, row, strict=True)
-                ),
+                *(value.ljust(width) for width, value in zip(indent, row, strict=True)),
                 sep="",
             )
     else:
