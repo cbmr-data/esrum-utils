@@ -103,7 +103,7 @@ class Notifier:
         name = self._highlight(name)
         state = self._highlight(update.state)
         last_state = f", was {update.last_state}" if update.last_state else ""
-        reason = f", reason is {update.reason}" if update.reason else ""
+        reason = f", reason is {update.reason!r}" if update.reason else ""
 
         if update.change == ChangeType.Added:
             return f"Added node {name} with state {state}{reason}"
