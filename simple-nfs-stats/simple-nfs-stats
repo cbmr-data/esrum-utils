@@ -257,7 +257,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         type=float,
         default=0.0,
         help="Do not print updates if the average ops time for both reads and writes "
-        "is less than MS miliseconds",
+        "is less than MS milliseconds",
     )
 
     return parser.parse_args(argv)
