@@ -312,7 +312,7 @@ RESOLUTION_FUNCTIONS = {
 
 
 class Args(argparse.Namespace):
-    mode: Literal["summary", "report"]
+    mode: Literal["summary", "report", "collect"]
     user_groups: Path | None
     sacct: Path
     sacct_output: Path | None
@@ -333,9 +333,10 @@ def parse_args(argv: list[str]) -> Args:
     parser.add_argument(
         "mode",
         type=str.lower,
-        choices=("summary", "report"),
-        help="Either generate a 'summary' of usage over some time period or generate "
-        "a daily, per-user report",
+        choices=("summary", "report", "collect"),
+        help="Either generate a 'summary' of usage over some time period, generate "
+        "a daily, per-user report, or only collect sacct output (requires "
+        "--write-sacct-output)",
     )
 
     parser.add_argument(
@@ -383,6 +384,11 @@ def parse_args(argv: list[str]) -> Args:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+    if args.mode == "collect":
+        if args.sacct_output:
+            abort("Cannot use --sacct-usage in `collect` mode")
+        elif not args.write_sacct_output:
+            abort("Must use --write-sacct-usage in `collect` mode")
 
     # Read saved sacct output or invoke sacct directly
     if args.sacct_output is not None:
@@ -394,6 +400,8 @@ def main(argv: list[str]) -> int:
 
     if args.write_sacct_output:
         args.write_sacct_output.write_text(raw_sacct_output)
+        if args.mode == "collect":
+            return 0
 
     sacct_output = parse_sacct_output(raw_sacct_output, source=raw_sacct_source)
     user_groups = read_user_groups(args.user_groups)
