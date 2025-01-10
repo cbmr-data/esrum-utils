@@ -411,9 +411,9 @@ def main(argv: list[str]) -> int:
         for _, stats in sacct_output:
             unique_users.update(stats.users)
 
-        unknown_users = unique_users - user_groups.keys()
-        if unknown_users:
-            abort("Unknown users:", unknown_users)
+        for user in unique_users - user_groups.keys():
+            eprint(f"WARNING: Unknown user {user!r} not found in {args.user_groups}")
+            user_groups[user] = "Unknown"
 
     if args.mode == "report":
         if user_groups is None:
