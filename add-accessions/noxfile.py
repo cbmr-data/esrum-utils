@@ -4,6 +4,7 @@ nox.options.sessions = [
     "style",
     "lints",
     "typing",
+    "tests",
 ]
 
 
@@ -33,3 +34,9 @@ def typing(session: nox.Session) -> None:
     session.install("nox~=2023.4.22")
     session.install("basedpyright==1.23.2")
     session.run("basedpyright", *SOURCES)
+
+
+@nox.session()
+def tests(session: nox.Session) -> None:
+    session.install("pytest")
+    session.run("pytest", "./tests/")

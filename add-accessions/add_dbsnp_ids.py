@@ -7,13 +7,22 @@ import os
 import re
 import sqlite3
 import sys
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator  # noqa: TC003
 from pathlib import Path
 from typing import Callable, NoReturn, TypeVar
 
-__VERSION__ = 2023_12_06_1
+__VERSION__ = 2025_01_21_1
 
-KEY_SPLIT = re.compile(r"[_:]")
+
+RE_SPLIT: re.Pattern[str] = re.compile(r"[_:]")
+
+
+def split_key(value: str, *, maxsplit: int = 0) -> list[str]:
+    """
+    Split a chr:pos or chr:pos:ref:alt key. Reverse split is used to avoid splitting
+    contig names that contain underscores, such as alt or random sequences.
+    """
+    return [it[::-1] for it in reversed(RE_SPLIT.split(value[::-1], maxsplit=maxsplit))]
 
 
 T = TypeVar("T")
@@ -30,7 +39,7 @@ def abort(*args: object) -> NoReturn:
 
 def progress(values: Iterable[T], *, desc: str | None = None) -> Iterable[T]:
     try:
-        import tqdm
+        import tqdm  # pyright: ignore[reportMissingModuleSource]
     except ImportError:
         return values
     else:
@@ -60,20 +69,20 @@ def read_identifiers(filepath: Path) -> Iterator[tuple[str, int, str, str, str]]
 
         for line in progress(handle, desc="load "):
             position, value = line.split()
-            chrom, position, ref, alts = KEY_SPLIT.split(position)
+            chrom, position, refs, alts = split_key(position, maxsplit=3)
             position = int(position)
 
-            assert "," not in ref, repr(line)
+            # Multiple references per line are not expected, but handled just in case
+            for ref in refs.split(","):
+                if position != current_pos or chrom != current_chr:
+                    yield from _yield_alleles()
 
-            if position != current_pos or chrom != current_chr:
-                yield from _yield_alleles()
+                    current_alleles.clear()
+                    current_chr = chrom
+                    current_pos = position
 
-                current_alleles.clear()
-                current_chr = chrom
-                current_pos = position
-
-            for alt in alts.split(","):
-                current_alleles.append((ref, alt, value))
+                for alt in alts.split(","):
+                    current_alleles.append((ref, alt, value))
 
         yield from _yield_alleles()
 
@@ -107,47 +116,82 @@ def main_index(database: Path, source: Path) -> int:
     return 0
 
 
+def get_column_indices(keys: dict[str, int], names: list[str]) -> list[int] | None:
+    column_indices: list[int] = []
+    for name in names:
+        indice = keys.get(name.upper())
+        if indice is None:
+            return None
+
+        column_indices.append(indice)
+
+    return column_indices
+
+
+def get_combined_key_function(
+    keys: dict[str, int],
+    key_column: str,
+) -> Callable[[list[str]], tuple[str, int, str, str]]:
+    column = keys.get(key_column.upper())
+    if column is None:
+        if key_column.isdigit():
+            column = int(key_column) - 1
+        else:
+            abort(f"Unknown key column {key_column!r}")
+
+    def _get_primary_key(row: list[str]) -> tuple[str, int, str, str]:
+        values = split_key(row[column], maxsplit=3)
+        if len(values) != 4:
+            abort("Malformed key; expected 4 values, but found", repr(row[column]))
+
+        chrom, pos, ref, alt = values
+        return (chrom, int(pos), ref, alt)
+
+    return _get_primary_key
+
+
 def get_primary_key_lookup(
     header: list[str] | None,
     key_column: str | None,
 ) -> Callable[[list[str]], tuple[str, int, str, str]]:
     keys = {key.upper(): idx for idx, key in enumerate(header or ())}
 
-    if key_column is None:
-        assert header is not None
+    if key_column is not None:
+        return get_combined_key_function(keys=keys, key_column=key_column)
+    elif header is None:
+        raise RuntimeError("Header is required if key-column is unspecified")
 
-        columns: list[int] = []
-        for key in ["CHROM", "POS", "REF", "ALT"]:
-            column = keys.get(key)
-            if column is None:
-                abort(f"Column {key} not found in table")
-            columns.append(column)
-
-        chrom, pos, ref, alt = columns
+    ####################################################################################
+    # Style 1: Individual columns for each value
+    indices = get_column_indices(keys=keys, names=["CHROM", "POS", "REF", "ALT"])
+    if indices is not None:
+        chrom, pos, ref, alt = indices
 
         def _get_primary_key(row: list[str]) -> tuple[str, int, str, str]:
             return (row[chrom], int(row[pos]), row[ref], row[alt])
 
         return _get_primary_key
-    else:
-        column = keys.get(key_column.upper())
-        if column is None:
-            if key_column.isdigit():
-                column = int(key_column) - 1
-            else:
-                abort(f"Unknown key column {key_column!r}")
 
-        splitter = KEY_SPLIT
+    ####################################################################################
+    # Style 2: Combined chr/pos column and individual alt/ref columns
+    indices = get_column_indices(keys=keys, names=["MarkerName", "Allele1", "Allele2"])
+    if indices is not None:
+        chr_pos, ref, alt = indices
 
         def _get_primary_key(row: list[str]) -> tuple[str, int, str, str]:
-            values = splitter.split(row[column])
-            if len(values) != 4:
-                abort("Malformed key; expected 4 values, but found", repr(row[column]))
+            values = split_key(row[chr_pos], maxsplit=3)
+            if len(values) != 2:
+                abort("Malformed key; expected 4 values, but found", repr(row[chr_pos]))
 
-            chrom, pos, ref, alt = splitter.split(row[column])
-            return (chrom, int(pos), ref, alt)
+            chrom, pos = values
+            return (chrom, int(pos), row[ref], row[alt])
 
         return _get_primary_key
+
+    abort(
+        "Table schema could not be determined. See --help text for --key-column for "
+        "more information about how this script looks up information"
+    )
 
 
 def main_lookup(
@@ -157,6 +201,7 @@ def main_lookup(
     key_column: str | None,
     missing_value: str,
     no_header: bool,
+    unordered_alleles: bool,
 ) -> int:
     con = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
     cur = con.cursor()
@@ -164,13 +209,12 @@ def main_lookup(
     cur.execute("PRAGMA LOCKING_MODE=EXCLUSIVE;")
 
     with source.open() as handle:
-        if no_header:
-            get_primary_key = get_primary_key_lookup(None, key_column=key_column)
-        else:
-            header = handle.readline()
-            print(header.rstrip("\r\n"), "rsID")
-            header = header.split()
-            get_primary_key = get_primary_key_lookup(header, key_column=key_column)
+        header: list[str] | None = None
+        if not no_header:
+            header = handle.readline().rstrip("\r\n").split()
+            print(*header, "rsID")
+
+        get_primary_key = get_primary_key_lookup(header, key_column=key_column)
 
         records_found = 0
         records_missing = 0
@@ -182,17 +226,25 @@ def main_lookup(
             except ValueError:
                 abort("Malformed key; position is not a number:\n", line)
 
-            query = cur.execute(
-                "SELECT"
-                " identifiers "
-                "FROM"
-                " data "
-                "WHERE"
-                " chr = ? AND pos = ? AND ref = ? AND alt = ?;",
-                (chrom, int(position), ref, alt),
-            )
+            ref, alt = ref.upper(), alt.upper()
 
-            identifers = ",".join(key for (key,) in query)
+            if unordered_alleles:
+                query = cur.execute(
+                    "SELECT identifiers "
+                    "FROM data "
+                    "WHERE chr = ? AND pos = ? "
+                    "  AND ((ref = ? AND alt = ?) OR (alt = ? AND ref = ?));",
+                    (chrom, int(position), ref, alt, ref, alt),
+                )
+            else:
+                query = cur.execute(
+                    "SELECT identifiers "
+                    "FROM data "
+                    "WHERE chr = ? AND pos = ? AND ref = ? AND alt = ?;",
+                    (chrom, int(position), ref, alt),
+                )
+
+            identifers = ",".join(sorted(set(key for (key,) in query)))
             if identifers:
                 records_found += 1
             else:
@@ -202,13 +254,10 @@ def main_lookup(
             print(line.rstrip("\r\n"), identifers)
 
     records_total = records_found + records_missing
+    records_found_pct = int(1000 * records_found / records_total) / 10  # rounded down
     eprint(
-        "Found IDs for {} of {} records ({:.1f}%), {} not found".format(
-            records_found,
-            records_total,
-            int(1000 * records_found / records_total) / 10,  # rounded down
-            records_missing,
-        )
+        f"Found IDs for {records_found} of {records_total} records "
+        f"({records_found_pct:.1f}%), {records_missing} not found"
     )
 
     return 0
@@ -231,27 +280,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--action",
+        metavar="X",
         choices=("index", "lookup"),
         default="lookup",
         help="Either create a new index file or look up positions and add IDs to a "
-        "whitespace separaed table.",
+        "whitespace separated table",
     )
     parser.add_argument(
         "--key-column",
         help="Column number (1-based) or name containing allele keys in the form "
-        "chr:pos:alt:ref. If not set, the script will look for columns 'CHROM', 'POS', "
-        "'REF', and 'ALT' (case-insensitive). For lookup only",
+        "chr:pos:alt:ref (may use '_' as the separator). If not set, the script will "
+        "look for columns 'CHROM', 'POS', 'REF', and 'ALT', or columns 'MarkerName' "
+        "(containing chr:pos), 'Allele1', 'Allele2'. Column names are "
+        "case-insensitive.  For lookup only",
     )
     parser.add_argument(
         "--missing-value",
+        metavar="X",
         default="NA",
-        help="Value used when no IDs were found",
+        help="Value used when no IDs were found. For lookup only",
     )
     parser.add_argument(
         "--no-header",
         action="store_true",
-        help="If set, the columns are assumed to not have names. "
-        "--key-column must be set to a number",
+        help="If set, the columns are assumed to not have names. --key-column must be "
+        "set to a number. For lookup only",
+    )
+    parser.add_argument(
+        "--unordered-alleles",
+        action="store_true",
+        help="When enabled, this script will look up IDs for alleles chrom:pos:A:B and "
+        " chrom:pos:B:A, i.e. making no assumption about which allele is the reference "
+        "allele and which is the alternative allele.",
     )
 
     return parser
@@ -267,6 +327,7 @@ def main(argv: list[str]) -> int:
     key_column: str | None = args.key_column
     missing_value: str = args.missing_value
     no_header: bool = args.no_header
+    unordered_alleles: bool = args.unordered_alleles
 
     if action == "index":
         return main_index(database=database, source=source)
@@ -281,6 +342,7 @@ def main(argv: list[str]) -> int:
             key_column=key_column,
             missing_value=missing_value,
             no_header=no_header,
+            unordered_alleles=unordered_alleles,
         )
     except BrokenPipeError as error:
         abort("ERROR:", error)
