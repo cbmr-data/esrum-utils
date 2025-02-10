@@ -12,7 +12,7 @@ import time
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Literal, NoReturn, TypeAlias, Union, cast
+from typing import Literal, NoReturn, TypeAlias, Union
 
 import coloredlogs
 import requests
@@ -20,8 +20,8 @@ import tomli
 from koda_validate import DataclassValidator, Valid
 from typing_extensions import override
 
-JSON: TypeAlias = Dict[
-    str, Union[float, str, bool, "JSON", List[Union[float, str, bool, "JSON"]]]
+JSON: TypeAlias = dict[
+    str, Union[float, str, bool, "JSON", list[Union[float, str, bool, "JSON"]]]
 ]
 
 _BAD_STATES = {"down", "drain", "drng", "fail", "failg", "pow_dn", "unk"}
@@ -58,7 +58,15 @@ class Status:
 
     @property
     def is_bad_state(self) -> bool:
-        return self.state in _BAD_STATES
+        return self.state in _BAD_STATES or self.state.endswith("*")
+
+    @staticmethod
+    def format(state: str) -> str:
+        if state.endswith("*"):
+            state = state.rstrip("*")
+            return f"{state} (not responding)"
+
+        return state
 
 
 @dataclass
@@ -329,9 +337,9 @@ class SlackNotifier(Notifier):
 
                 if change not in (ChangeType.Added, ChangeType.Removed):
                     assert update.last_state is not None
-                    item.add_text(update.last_state, italic=True)
+                    item.add_text(Status.format(update.last_state), italic=True)
                     item.add_text(" to ")
-                    item.add_text(update.state, italic=True)
+                    item.add_text(Status.format(update.state), italic=True)
 
                 if update.reason:
                     item.add_text(" with reason ")
@@ -450,7 +458,7 @@ def collect_node_status(sinfo: str) -> dict[str, Status] | None:
             reason = None
 
         name = row["NODELIST"]
-        state = row["STATE"].strip("*")
+        state = row["STATE"]
         result[name] = Status(state=state, reason=reason)
 
     return result
