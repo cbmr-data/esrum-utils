@@ -459,6 +459,11 @@ def collect_node_status(sinfo: str) -> dict[str, Status] | None:
 
         name = row["NODELIST"]
         state = row["STATE"]
+
+        # Responding/not responding is not interesting for nodes in a bad state
+        if state in _BAD_STATES:
+            state = state.rstrip("*")
+
         result[name] = Status(state=state, reason=reason)
 
     return result
