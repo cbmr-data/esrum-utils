@@ -88,8 +88,8 @@ class Report(Base):
     success: Mapped[bool] = mapped_column()
 
     @staticmethod
-    def new(*, success: bool) -> User:
-        return User(
+    def new(*, success: bool) -> Report:
+        return Report(
             attempted=timestamp(),
             success=success,
         )
