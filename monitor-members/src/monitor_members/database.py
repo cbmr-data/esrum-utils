@@ -78,7 +78,7 @@ class Database:
         self,
         groups: dict[str, GroupType],
     ) -> list[GroupChange] | None:
-        self._log.info("updating LDAP group memberships")
+        self._log.info("updating LDAP group memberships for %i groups", len(groups))
         if self._session is None:
             raise RuntimeError("database not initialized")
 

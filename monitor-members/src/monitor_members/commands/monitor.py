@@ -9,7 +9,7 @@ import typed_argparse as tap
 from monitor_members.common import main_func, setup_logging, which
 from monitor_members.config import Config
 from monitor_members.database import Database
-from monitor_members.groups import collect_groups
+from monitor_members.groups import GroupType, collect_groups
 from monitor_members.kerberos import Kerberos
 from monitor_members.ldap import LDAP
 from monitor_members.slack import SlackNotifier
@@ -66,6 +66,10 @@ def main(args: Args) -> int:
         sensitive_groups=conf.ldap.sensitive_groups,
     )
 
+    for typ in (GroupType.SENSITIVE, GroupType.MANDATORY, GroupType.REGULAR):
+        vals = sorted(k for k, v in groups.items() if v == typ)
+        log.info("Found %i %s groups: %s", len(vals), typ.name.title(), ", ".join(vals))
+
     ldap = LDAP(
         uri=conf.ldap.uri,
         searchbase=conf.ldap.searchbase,
@@ -112,6 +116,7 @@ def main(args: Args) -> int:
                 break
 
             try:
+                log.info("Next loop in %i minutes", args.loop)
                 time.sleep(60 * args.loop)
             except KeyboardInterrupt:
                 break
