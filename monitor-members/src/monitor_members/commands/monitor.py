@@ -36,6 +36,11 @@ class Args(tap.TypedArgs):
         help="Optional path to kinit executable",
     )
 
+    ldapsearch_exe: str = tap.arg(
+        default=which("ldapsearch"),
+        help="Optional path to ldapsearch executable",
+    )
+
     ####################################################################################
     # Logging
 
@@ -73,6 +78,7 @@ def main(args: Args) -> int:
     ldap = LDAP(
         uri=conf.ldap.uri,
         searchbase=conf.ldap.searchbase,
+        ldapsearch_exe=args.ldapsearch_exe,
     )
 
     notifier = SlackNotifier(

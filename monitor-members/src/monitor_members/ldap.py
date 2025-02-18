@@ -7,6 +7,7 @@ from monitor_members.common import run_subprocess
 
 class LDAP:
     __slots__ = [
+        "_ldapsearch_exe",
         "_log",
         "_searchbase",
         "_uri",
@@ -16,10 +17,17 @@ class LDAP:
     _uri: str
     _searchbase: str
 
-    def __init__(self, *, uri: str, searchbase: str) -> None:
+    def __init__(
+        self,
+        *,
+        ldapsearch_exe: str = "ldapsearch",
+        uri: str,
+        searchbase: str,
+    ) -> None:
         self._log = logging.getLogger("ldap")
         self._uri = uri
         self._searchbase = searchbase
+        self._ldapsearch_exe = ldapsearch_exe
 
     def display_name(self, name: str) -> str | None:
         if (lines := self._get(name, "displayName")) is not None:
@@ -42,7 +50,7 @@ class LDAP:
         proc = run_subprocess(
             self._log,
             [
-                "ldapsearch",
+                self._ldapsearch_exe,
                 "-o",
                 "ldif-wrap=no",
                 "-LLL",
