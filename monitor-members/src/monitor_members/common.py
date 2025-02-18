@@ -97,7 +97,7 @@ def run_subprocess(
     if not command:
         raise ValueError(command)
 
-    proc = subprocess.Popen(
+    proc = subprocess.Popen(  # noqa: S603
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
