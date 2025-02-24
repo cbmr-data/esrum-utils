@@ -60,6 +60,9 @@ class User(Base):
     # The earliest date/time at which the user was no longer recorded in the group
     removed: Mapped[datetime | None] = mapped_column()
 
+    # Indicates if the user was added while initializing a group
+    initial: Mapped[bool] = mapped_column()
+
     def mark_as_removed(self) -> None:
         if self.removed is not None:
             raise RuntimeError("attempted to flag already removed user")
@@ -67,12 +70,13 @@ class User(Base):
         self.removed = timestamp()
 
     @staticmethod
-    def new(*, name: str, group: Group) -> User:
+    def new(*, name: str, group: Group, initial: bool) -> User:
         return User(
             name=name,
             group_id=group.id,
             added=timestamp(),
             removed=None,
+            initial=initial,
         )
 
 

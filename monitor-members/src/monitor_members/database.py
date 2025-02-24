@@ -112,7 +112,13 @@ class Database:
 
             for username in ldap_users - set(current_users):
                 self._log.info("adding user to group %r: %r", group_name, username)
-                self._session.add(User.new(name=username, group=group))
+                self._session.add(
+                    User.new(
+                        name=username,
+                        group=group,
+                        initial=initializing,
+                    )
+                )
 
                 if not initializing:
                     updates.append(
