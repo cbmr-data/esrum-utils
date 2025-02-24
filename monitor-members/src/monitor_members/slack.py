@@ -4,7 +4,6 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from datetime import datetime
 from itertools import groupby
 from typing import Iterator, TypeAlias, Union
 
@@ -59,17 +58,6 @@ class SlackNotifier:
             {
                 "type": "rich_text",
                 "elements": [
-                    {
-                        "type": "rich_text_section",
-                        "elements": [
-                            {
-                                "type": "text",
-                                "text": "Changes to LDAP groups at {}:\n\n".format(
-                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                ),
-                            }
-                        ],
-                    },
                     {
                         "type": "rich_text_list",
                         "style": "bullet",
