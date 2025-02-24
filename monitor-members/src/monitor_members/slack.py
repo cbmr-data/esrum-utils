@@ -32,7 +32,7 @@ class SlackNotifier:
         changes: Iterable[GroupChange],
     ) -> bool:
         if not self._webhooks:
-            self._log.warning("Slack update not sent; no webhooks configured")
+            self._log.warning("Slack LDAP update not sent; no webhooks configured")
             return False
 
         elements: list[float | str | bool | JSON] = []
@@ -69,6 +69,32 @@ class SlackNotifier:
         ]
 
         return self._send_message(blocks)
+
+    def send_sacct_message(
+        self,
+        users: Iterable[str],
+    ) -> bool:
+        if not self._webhooks:
+            self._log.warning("Slack sacct update not sent; no webhooks configured")
+            return False
+
+        users = list(users)
+        user_list = " ".join(sorted(users))
+        n = len(users)
+
+        return self._send_message(
+            [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f":warning: {n} user(s) missing from sacctmgr: Add "
+                        f"with `for user in {user_list};do sudo sacctmgr -i create "
+                        "user name=${user} cluster=cluster account=cbmr;done`",
+                    },
+                }
+            ]
+        )
 
     def _add_user(
         self,
