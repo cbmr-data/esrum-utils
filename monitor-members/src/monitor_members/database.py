@@ -214,6 +214,22 @@ class Database:
 
         return None if report is None else report.attempted
 
+    def get_users(self, name: str) -> set[str]:
+        if self._session is None:
+            raise RuntimeError("database not initialized")
+
+        group = self._session.scalars(
+            sqlalchemy.select(Group).where(Group.name == name)
+        ).one()
+
+        return set(
+            self._session.scalars(
+                sqlalchemy.select(User.name).where(
+                    (User.removed == None) & (User.group == group)  # noqa: E711
+                )
+            ).all()
+        )
+
     @staticmethod
     def create_engine(path: Path) -> sqlalchemy.Engine:
         return sqlalchemy.create_engine(f"sqlite+pysqlite:///{path}")
