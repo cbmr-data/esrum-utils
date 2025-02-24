@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import ClassVar
 
-from sqlalchemy import TIMESTAMP, ForeignKey, String
+from sqlalchemy import DateTime, Dialect, ForeignKey, String, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 __all__ = [
@@ -16,10 +16,34 @@ __all__ = [
 ]
 
 
+# https://docs.sqlalchemy.org/en/20/core/custom_types.html#store-timezone-aware-timestamps-as-timezone-naive-utc
+class TZDateTime(TypeDecorator[datetime]):
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(
+        self,
+        value: datetime | None,
+        dialect: Dialect,
+    ) -> datetime | None:
+        if value is not None:
+            if not value.tzinfo or value.tzinfo.utcoffset(value) is None:
+                raise TypeError("tzinfo is required")
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+
+    def process_result_value(
+        self,
+        value: datetime | None,
+        dialect: Dialect,
+    ) -> datetime | None:
+        return None if value is None else value.replace(tzinfo=timezone.utc)
+
+
 class Base(DeclarativeBase):
-    type_annotation_map: ClassVar[Mapping[type[datetime], TIMESTAMP]] = {
+    type_annotation_map: ClassVar[Mapping[type[datetime], TZDateTime]] = {
         # Record timestamps with timezone
-        datetime: TIMESTAMP(timezone=True),
+        datetime: TZDateTime(),
     }
 
 
