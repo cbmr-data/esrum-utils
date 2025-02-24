@@ -8,7 +8,7 @@ import sys
 from collections.abc import Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Callable, Literal, NoReturn, TypeVar
+from typing import Callable, Iterator, Literal, NoReturn, TypeVar
 
 import coloredlogs
 
@@ -121,12 +121,23 @@ def run_subprocess(
 
 
 def pretty_list(items: Sequence[object]) -> str:
-    if len(items) == 0:
-        return "N/A"
-    elif len(items) == 1:
-        return str(items[0])
-    elif len(items) == 2:
-        return f"{items[0]} and {items[2]}"
+    return "".join(str(v) for v in pretty_list_t(items))
 
-    main = ", ".join(str(it) for it in items[:-1])
-    return f"{main}, and {items[-1]}"
+
+def pretty_list_t(items: Sequence[T]) -> Iterator[str | T]:
+    if len(items) == 0:
+        yield "N/A"
+    elif len(items) == 1:
+        yield from items
+    elif len(items) == 2:
+        yield items[0]
+        yield " and "
+        yield items[1]
+    else:
+        for idx, item in enumerate(items):
+            if idx + 1 == len(items):
+                yield ", and "
+            elif idx:
+                yield ", "
+
+            yield item
