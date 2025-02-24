@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import TypeAlias, Union
+from itertools import groupby
+from typing import Iterator, TypeAlias, Union
 
 import requests
 
+from monitor_members.common import pretty_list_t
 from monitor_members.database import ChangeType, GroupChange
 
 JSON: TypeAlias = dict[
@@ -76,9 +78,8 @@ class SlackNotifier:
 
         return self._send_message(blocks)
 
-    @classmethod
     def _add_user(
-        cls,
+        self,
         username: str,
         displayname: str | None,
         updates: list[GroupChange],
@@ -91,52 +92,44 @@ class SlackNotifier:
             elements.append({"type": "text", "text": " "})
 
         if displayname is not None:
-            elements.append({"type": "text", "text": f"{displayname}"})
+            elements.append({"type": "text", "text": f"{displayname} "})
             elements.append(
                 {"type": "text", "text": f" ({username})", "style": {"italic": True}}
             )
         else:
-            elements.append({"type": "text", "text": f"{username}"})
+            elements.append({"type": "text", "text": f"{username} "})
 
-        if additions := [it for it in updates if it.change == ChangeType.ADD]:
-            elements.append({"type": "text", "text": " added to"})
-            elements.extend(cls.add_section(additions))
-
-        if removals := [it for it in updates if it.change == ChangeType.DEL]:
-            action = ", and removed from" if additions else " removed from"
-            elements.append({"type": "text", "text": action})
-            elements.extend(cls.add_section(removals))
+        elements.extend(self.add_change_section(username=username, updates=updates))
 
         return {
             "type": "rich_text_section",
             "elements": elements,
         }
 
-    @classmethod
-    def add_section(cls, updates: list[GroupChange]) -> list[JSON]:
-        elements: list[JSON] = []
-        warnings = [it for it in updates if it.warning]
-        updates = [it for it in updates if not it.warning]
-
-        for idx, it in enumerate(warnings):
+    def add_change_section(
+        self,
+        *,
+        username: str,
+        updates: Iterable[GroupChange],
+    ) -> Iterator[JSON]:
+        for idx, (changes, values) in enumerate(
+            groupby(updates, key=lambda it: it.changes)
+        ):
             if idx:
-                elements.append({"type": "text", "text": ","})
+                yield {"type": "text", "text": ";"}
 
-            elements.append(
-                {"type": "text", "text": f" {it.group}", "style": {"bold": True}}
-            )
+            summary = self._summarize_changes(username=username, changes=changes)
+            yield {"type": "text", "text": f" {summary} "}
 
-        if updates:
-            labels: list[str] = []
-            if warnings:
-                labels.append("")
-            else:
-                elements.append({"type": "text", "text": " "})
-
-            labels.extend(it.group for it in updates)
-            elements.append({"type": "text", "text": ", ".join(labels)})
-
-        return elements
+            for it in pretty_list_t(tuple(values)):
+                if isinstance(it, GroupChange):
+                    yield {
+                        "type": "text",
+                        "text": it.group,
+                        "style": {"bold": it.warning},
+                    }
+                else:
+                    yield {"type": "text", "text": it}
 
     def _send_message(self, blocks: list[JSON]) -> bool:
         data = {"blocks": blocks}
@@ -166,3 +159,48 @@ class SlackNotifier:
                 any_errors = True
 
         return not any_errors
+
+    def _summarize_changes(
+        self,
+        *,
+        username: str,
+        changes: Sequence[ChangeType],
+    ) -> str:
+        if not changes:
+            raise ValueError(changes)
+
+        if len(changes) == 1:
+            for value in changes:
+                if value == ChangeType.ADD:
+                    return "added to"
+                elif value == ChangeType.DEL:
+                    return "removed from"
+                else:
+                    raise NotImplementedError(value)
+
+        idx = 0  # enumerate is not used, due to use of `continue`
+        result: list[str] = []
+        previous: ChangeType | None = None
+        for value in changes:
+            if value == previous:
+                # This normally shouldn't happen
+                self._log.warning("repeated changes found for user %r", username)
+                continue
+
+            if len(changes) > 1 and idx + 1 == len(changes):
+                result.append(", and ")
+            elif idx:
+                result.append(", ")
+
+            again = " again" if previous not in (None, value) else ""
+            if value == ChangeType.ADD:
+                result.append(f"added{again} to")
+            elif value == ChangeType.DEL:
+                result.append(f"removed{again} from")
+            else:
+                raise NotImplementedError(value)
+
+            previous = value
+            idx += 1
+
+        return "".join(result)

@@ -25,8 +25,14 @@ class ChangeType(enum.Enum):
 class GroupChange:
     user: str
     group: str
-    change: ChangeType
-    warning: bool
+    group_type: GroupType
+    changes: tuple[ChangeType, ...]
+
+    @property
+    def warning(self) -> bool:
+        return (self.group_type == GroupType.SENSITIVE) or (
+            self.group_type == GroupType.MANDATORY and ChangeType.DEL in self.changes
+        )
 
 
 class Database:
@@ -125,8 +131,8 @@ class Database:
                         GroupChange(
                             user=username,
                             group=group_name,
-                            change=ChangeType.ADD,
-                            warning=group_type == GroupType.SENSITIVE,
+                            group_type=group_type,
+                            changes=(ChangeType.ADD,),
                         )
                     )
 
@@ -139,8 +145,8 @@ class Database:
                         GroupChange(
                             user=username,
                             group=group_name,
-                            change=ChangeType.DEL,
-                            warning=group_type != GroupType.REGULAR,
+                            group_type=group_type,
+                            changes=(ChangeType.DEL,),
                         )
                     )
         self._session.commit()
