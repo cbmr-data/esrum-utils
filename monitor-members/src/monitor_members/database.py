@@ -41,6 +41,7 @@ class Database:
     __slots__ = [
         "_database",
         "_engine",
+        "_groups",
         "_ldap",
         "_log",
         "_session",
@@ -48,13 +49,21 @@ class Database:
 
     _database: Path
     _engine: sqlalchemy.Engine | None
+    _groups: dict[str, GroupType]
     _ldap: LDAP
     _log: logging.Logger
     _session: sqlalchemy.orm.Session | None
 
-    def __init__(self, database: Path, ldap: LDAP) -> None:
+    def __init__(
+        self,
+        *,
+        database: Path,
+        ldap: LDAP,
+        groups: dict[str, GroupType],
+    ) -> None:
         self._database = database
         self._engine = None
+        self._groups = dict(groups)
         self._ldap = ldap
         self._log = logging.getLogger("database")
         self._session = None
@@ -82,7 +91,7 @@ class Database:
         self._session = None
         self._engine = None
 
-    def unreported_updates(self, groups: dict[str, GroupType]) -> list[GroupChange]:
+    def unreported_updates(self) -> list[GroupChange]:
         """Returns updates since the last (succesful) report"""
         if self._session is None:
             raise RuntimeError("database not initialized")
@@ -104,7 +113,7 @@ class Database:
             list
         )
         for user in self._session.scalars(query):
-            if user.group.name not in groups:
+            if user.group.name not in self._groups:
                 # This may happen if the user removes groups from the config file
                 self._log.warning(
                     "skipping update to group %r for %r; group not configured",
@@ -127,19 +136,21 @@ class Database:
                 GroupChange(
                     user=user,
                     group=group,
-                    group_type=groups[group],
+                    group_type=self._groups[group],
                     changes=tuple(change for _, change in sorted(values)),
                 )
             )
 
         return changes
 
-    def update_ldap_groups(self, groups: dict[str, GroupType]) -> bool:
-        self._log.info("updating LDAP group memberships for %i groups", len(groups))
+    def update_ldap_groups(self) -> bool:
+        self._log.info(
+            "updating LDAP group memberships for %i groups", len(self._groups)
+        )
         if self._session is None:
             raise RuntimeError("database not initialized")
 
-        for group_name in sorted(groups):
+        for group_name in sorted(self._groups):
             self._log.debug("checking group %r for updates", group_name)
             group_stmt = sqlalchemy.select(Group).where(Group.name == group_name)
             group = self._session.scalars(group_stmt).one_or_none()

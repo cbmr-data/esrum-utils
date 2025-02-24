@@ -94,17 +94,17 @@ def main(args: Args) -> int:
         kinit_exe=args.kinit_exe,
     )
 
-    with Database(database=conf.database, ldap=ldap) as database:
+    with Database(database=conf.database, ldap=ldap, groups=groups) as database:
         # display names are assumed to be unchanging over the runtime of the script
         displaynames: dict[str, str | None] = {}
 
         while True:
             if kerb.refresh():
-                if not database.update_ldap_groups(groups):
+                if not database.update_ldap_groups():
                     log.error("could not update group memberships")
                     return 1
 
-                if changes := database.unreported_updates(groups):
+                if changes := database.unreported_updates():
                     for change in changes:
                         if change.user not in displaynames:
                             displaynames[change.user] = ldap.display_name(change.user)
