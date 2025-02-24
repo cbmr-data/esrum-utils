@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import ClassVar
@@ -80,10 +81,17 @@ class User(Base):
         )
 
 
+class ReportKind(enum.Enum):
+    LDAP = enum.auto()
+    SACCT = enum.auto()
+
+
 class Report(Base):
     __tablename__ = "reports"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+
+    kind: Mapped[ReportKind] = mapped_column()
 
     # The time at which a report was attempted
     attempted: Mapped[datetime] = mapped_column()
@@ -92,8 +100,9 @@ class Report(Base):
     success: Mapped[bool] = mapped_column()
 
     @staticmethod
-    def new(*, success: bool) -> Report:
+    def new(*, kind: ReportKind, success: bool) -> Report:
         return Report(
+            kind=kind,
             attempted=timestamp(),
             success=success,
         )

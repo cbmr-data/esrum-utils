@@ -12,6 +12,7 @@ from monitor_members.database import Database
 from monitor_members.groups import GroupType, collect_groups
 from monitor_members.kerberos import Kerberos
 from monitor_members.ldap import LDAP
+from monitor_members.models import ReportKind
 from monitor_members.slack import SlackNotifier
 
 
@@ -113,7 +114,7 @@ def main(args: Args) -> int:
                         changes=changes,
                     )
 
-                    database.add_report(success=report_sent)
+                    database.add_report(kind=ReportKind.LDAP, success=report_sent)
             else:
                 log.error("unable to check group memberships; sleeping")
 

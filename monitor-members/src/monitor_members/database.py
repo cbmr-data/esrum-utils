@@ -15,7 +15,7 @@ import sqlalchemy.orm
 
 from monitor_members.groups import GroupType
 from monitor_members.ldap import LDAP
-from monitor_members.models import Base, Group, Report, User
+from monitor_members.models import Base, Group, Report, ReportKind, User
 
 
 class ChangeType(enum.Enum):
@@ -87,19 +87,12 @@ class Database:
         if self._session is None:
             raise RuntimeError("database not initialized")
 
-        last_report = self._session.scalars(
-            sqlalchemy.select(Report)
-            .where(Report.success)
-            .order_by(Report.attempted.desc())
-        ).first()
-
         # All changes are selected, since changes to `groups` are expected to be rare
-        if last_report is None:
+        since = self.last_succesful_report(ReportKind.LDAP)
+        if since is None:
             self._log.info("collecting all unreported changes")
             query = sqlalchemy.select(User)
-            since = None
         else:
-            since = last_report.attempted
             self._log.info("collecting unreported changes since %s", since)
             query = sqlalchemy.select(User).where(
                 (User.added >= since)
@@ -191,12 +184,24 @@ class Database:
 
         return True
 
-    def add_report(self, *, success: bool) -> None:
+    def add_report(self, *, kind: ReportKind, success: bool) -> None:
         if self._session is None:
             raise RuntimeError("database not initialized")
 
-        self._session.add(Report.new(success=success))
+        self._session.add(Report.new(kind=kind, success=success))
         self._session.commit()
+
+    def last_succesful_report(self, kind: ReportKind) -> datetime | None:
+        if self._session is None:
+            raise RuntimeError("database not initialized")
+
+        report = self._session.scalars(
+            sqlalchemy.select(Report)
+            .where(Report.success & (Report.kind == kind))
+            .order_by(Report.attempted.desc())
+        ).first()
+
+        return None if report is None else report.attempted
 
     @staticmethod
     def create_engine(path: Path) -> sqlalchemy.Engine:
