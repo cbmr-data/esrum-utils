@@ -99,12 +99,11 @@ def main(args: Args) -> int:
 
         while True:
             if kerb.refresh():
-                changes = database.update_ldap_groups(groups)
-                if changes is None:
+                if not database.update_ldap_groups(groups):
                     log.error("could not update group memberships")
                     return 1
 
-                if changes:
+                if changes := database.unreported_updates(groups):
                     for change in changes:
                         if change.user not in displaynames:
                             displaynames[change.user] = ldap.display_name(change.user)

@@ -3,7 +3,9 @@ from __future__ import annotations
 import enum
 import logging
 import types
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Self
 
@@ -80,16 +82,71 @@ class Database:
         self._session = None
         self._engine = None
 
-    def update_ldap_groups(
-        self,
-        groups: dict[str, GroupType],
-    ) -> list[GroupChange] | None:
+    def unreported_updates(self, groups: dict[str, GroupType]) -> list[GroupChange]:
+        """Returns updates since the last (succesful) report"""
+        if self._session is None:
+            raise RuntimeError("database not initialized")
+
+        last_report = self._session.scalars(
+            sqlalchemy.select(Report)
+            .where(Report.success)
+            .order_by(Report.attempted.desc())
+        ).first()
+
+        # All changes are selected, since changes to `groups` are expected to be rare
+        if last_report is None:
+            self._log.info("collecting all unreported changes")
+            query = sqlalchemy.select(User)
+            since = None
+        else:
+            since = last_report.attempted
+            self._log.info("collecting unreported changes since %s", since)
+            query = sqlalchemy.select(User).where(
+                (User.added >= since)
+                | ((User.removed != None) & (User.removed >= since))  # noqa: E711
+            )
+
+        # group by user/group
+        updates: dict[tuple[str, str], list[tuple[datetime, ChangeType]]] = defaultdict(
+            list
+        )
+        for user in self._session.scalars(query):
+            if user.group.name not in groups:
+                # This may happen if the user removes groups from the config file
+                self._log.warning(
+                    "skipping update to group %r for %r; group not configured",
+                    user.group.name,
+                    user.name,
+                )
+                continue
+
+            key = (user.name, user.group.name)
+
+            if not user.initial and (since is None or user.added > since):
+                updates[key].append((user.added, ChangeType.ADD))
+
+            if user.removed is not None and (since is None or user.removed > since):
+                updates[key].append((user.removed, ChangeType.DEL))
+
+        changes: list[GroupChange] = []
+        for (user, group), values in sorted(updates.items()):
+            changes.append(
+                GroupChange(
+                    user=user,
+                    group=group,
+                    group_type=groups[group],
+                    changes=tuple(change for _, change in sorted(values)),
+                )
+            )
+
+        return changes
+
+    def update_ldap_groups(self, groups: dict[str, GroupType]) -> bool:
         self._log.info("updating LDAP group memberships for %i groups", len(groups))
         if self._session is None:
             raise RuntimeError("database not initialized")
 
-        updates: list[GroupChange] = []
-        for group_name, group_type in sorted(groups.items()):
+        for group_name in sorted(groups):
             self._log.debug("checking group %r for updates", group_name)
             group_stmt = sqlalchemy.select(Group).where(Group.name == group_name)
             group = self._session.scalars(group_stmt).one_or_none()
@@ -114,7 +171,7 @@ class Database:
             ldap_users = self._ldap.members(group_name)
             if ldap_users is None:
                 self._log.error("failed to get LDAP members for %r", group_name)
-                return None
+                return False
 
             for username in ldap_users - set(current_users):
                 self._log.info("adding user to group %r: %r", group_name, username)
@@ -126,38 +183,20 @@ class Database:
                     )
                 )
 
-                if not initializing:
-                    updates.append(
-                        GroupChange(
-                            user=username,
-                            group=group_name,
-                            group_type=group_type,
-                            changes=(ChangeType.ADD,),
-                        )
-                    )
-
             for username in set(current_users) - ldap_users:
                 self._log.info("removing user from group %r: %r", group_name, username)
                 current_users[username].mark_as_removed()
 
-                if not initializing:
-                    updates.append(
-                        GroupChange(
-                            user=username,
-                            group=group_name,
-                            group_type=group_type,
-                            changes=(ChangeType.DEL,),
-                        )
-                    )
         self._session.commit()
 
-        return updates
+        return True
 
     def add_report(self, *, success: bool) -> None:
         if self._session is None:
             raise RuntimeError("database not initialized")
 
         self._session.add(Report.new(success=success))
+        self._session.commit()
 
     @staticmethod
     def create_engine(path: Path) -> sqlalchemy.Engine:
