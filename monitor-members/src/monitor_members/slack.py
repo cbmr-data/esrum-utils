@@ -32,6 +32,10 @@ class SlackNotifier:
         displaynames: dict[str, str | None],
         changes: Iterable[GroupChange],
     ) -> bool:
+        if not self._webhooks:
+            self._log.warning("Slack update not sent; no webhooks configured")
+            return False
+
         elements: list[float | str | bool | JSON] = []
 
         # changes grouped by user
