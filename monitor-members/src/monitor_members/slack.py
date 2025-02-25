@@ -90,7 +90,8 @@ class SlackNotifier:
                         "type": "mrkdwn",
                         "text": f":warning: {n} user(s) missing from sacctmgr: Add "
                         f"with `for user in {user_list};do sudo sacctmgr -i create "
-                        "user name=${user} cluster=cluster account=cbmr;done`",
+                        "user name=${user} cluster=cluster account=cbmr;done`\n"
+                        "*Please react to this message before running the command!*",
                     },
                 }
             ]
