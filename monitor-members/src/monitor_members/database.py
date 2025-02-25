@@ -177,7 +177,7 @@ class Database:
                 self._log.error("failed to get LDAP members for %r", group_name)
                 return False
 
-            for username in ldap_users - set(current_users):
+            for username in sorted(ldap_users - set(current_users)):
                 self._log.info("adding user to group %r: %r", group_name, username)
                 self._session.add(
                     User.new(
@@ -187,7 +187,7 @@ class Database:
                     )
                 )
 
-            for username in set(current_users) - ldap_users:
+            for username in sorted(set(current_users) - ldap_users):
                 self._log.info("removing user from group %r: %r", group_name, username)
                 current_users[username].mark_as_removed()
 
