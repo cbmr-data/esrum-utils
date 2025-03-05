@@ -51,11 +51,7 @@ def main(args: Args) -> int:
         log.critical("aborting due to config error")
         return 1
 
-    sacct_account = conf.sacct.account
-    sacct_cluster = conf.sacct.cluster
-    sacct_group = conf.sacct.ldap_group
-
-    if not (sacct_account and sacct_cluster and sacct_group):
+    if (sacct := conf.sacct) is None:
         log.critical("SACCT account, cluster, and LDAP group must be set in TOML file")
         return 1
 
@@ -74,12 +70,12 @@ def main(args: Args) -> int:
         searchbase=conf.ldap.searchbase,
     )
 
-    ldap_members = ldap.members(sacct_group)
+    ldap_members = ldap.members(sacct.ldap_group)
     if ldap_members is None:
-        log.error("failed to get members of LDAP group %r", sacct_group)
+        log.error("failed to get members of LDAP group %r", sacct.ldap_group)
         return 1
 
-    sacct = Sacctmgr(cluster=sacct_cluster, account=sacct_account)
+    sacct = Sacctmgr(cluster=sacct.cluster, account=sacct.account)
     sacct_members = sacct.get_associations()
     if sacct_members is None:
         log.error("failed to get sacct members")

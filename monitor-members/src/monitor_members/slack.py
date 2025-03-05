@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from itertools import groupby
-from typing import Iterator, TypeAlias, Union
+from typing import TypeAlias, Union
 
 import requests
 
@@ -72,7 +72,10 @@ class SlackNotifier:
 
     def send_sacct_message(
         self,
+        *,
         users: Iterable[str],
+        cluster: str,
+        account: str,
     ) -> bool:
         if not self._webhooks:
             self._log.warning("Slack sacct update not sent; no webhooks configured")
@@ -90,8 +93,9 @@ class SlackNotifier:
                         "type": "mrkdwn",
                         "text": f":warning: {n} user(s) missing from sacctmgr: Add "
                         f"with `for user in {user_list};do sudo sacctmgr -i create "
-                        "user name=${user} cluster=cluster account=cbmr;done`\n"
-                        "*Please react to this message before running the command!*",
+                        f"user name=${{user}} cluster={cluster} account={account};"
+                        "done`\n*Please react to this message before running the "
+                        "command!*",
                     },
                 }
             ]

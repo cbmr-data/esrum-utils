@@ -91,12 +91,8 @@ def main(args: Args) -> int:
         ldapsearch_exe=args.ldapsearch_exe,
     )
 
-    if (
-        conf.sacct.ldap_group is None
-        or conf.sacct.cluster is None
-        or conf.sacct.account is None
-    ):
-        log.warning("Sacct account monitoring disabled; not all 3 settings specified")
+    if conf.sacct is None:
+        log.warning("Sacct account monitoring disabled")
         sacct = None
     else:
         sacct = Sacctmgr(
@@ -142,7 +138,7 @@ def main(args: Args) -> int:
 
                     database.add_report(kind=ReportKind.LDAP, success=report_sent)
 
-                if sacct is not None and conf.sacct.ldap_group is not None:
+                if sacct is not None and conf.sacct is not None:
                     last_report = database.last_succesful_report(ReportKind.SACCT)
 
                     if (
@@ -150,10 +146,15 @@ def main(args: Args) -> int:
                         or (last_report - timestamp()) >= sacct_interval
                     ):
                         log.info("Checking for membership in sacctmgr")
+
                         if (sacct_users := sacct.get_associations()) is not None:
                             ldap_users = database.get_users(conf.sacct.ldap_group)
                             if missing_users := ldap_users.difference(sacct_users):
-                                report_sent = notifier.send_sacct_message(missing_users)
+                                report_sent = notifier.send_sacct_message(
+                                    users=missing_users,
+                                    cluster=conf.sacct.cluster,
+                                    account=conf.sacct.account,
+                                )
 
                                 database.add_report(
                                     kind=ReportKind.SACCT,

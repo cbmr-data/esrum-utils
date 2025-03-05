@@ -5,10 +5,10 @@ import shlex
 import shutil
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Callable, Iterator, Literal, NoReturn, TypeVar
+from typing import Callable, Literal, NoReturn, TypeVar
 
 import coloredlogs
 

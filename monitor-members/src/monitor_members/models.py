@@ -24,7 +24,7 @@ class TZDateTime(TypeDecorator[datetime]):
     def process_bind_param(
         self,
         value: datetime | None,
-        dialect: Dialect,
+        dialect: Dialect,  # noqa: ARG002
     ) -> datetime | None:
         if value is not None:
             if not value.tzinfo or value.tzinfo.utcoffset(value) is None:
@@ -35,7 +35,7 @@ class TZDateTime(TypeDecorator[datetime]):
     def process_result_value(
         self,
         value: datetime | None,
-        dialect: Dialect,
+        dialect: Dialect,  # noqa: ARG002
     ) -> datetime | None:
         return None if value is None else value.replace(tzinfo=timezone.utc)
 

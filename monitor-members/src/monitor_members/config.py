@@ -45,9 +45,9 @@ class LDAP:
 
 @dataclasses.dataclass
 class Sacct:
-    ldap_group: str | None = None
-    cluster: str | None = None
-    account: str | None = None
+    ldap_group: str
+    cluster: str
+    account: str
 
 
 @dataclasses.dataclass
@@ -56,7 +56,7 @@ class Config:
     ldap: LDAP
     kerberos: Kerberos = dataclasses.field(default_factory=Kerberos)
     slack: Slack = dataclasses.field(default_factory=Slack)
-    sacct: Sacct = dataclasses.field(default_factory=Sacct)
+    sacct: Sacct | None = dataclasses.field(default=None)
 
     @classmethod
     def load(cls, filepath: Path) -> Config | None:
