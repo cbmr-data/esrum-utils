@@ -147,11 +147,11 @@ class SlackNotifier:
             for it in pretty_list_t(tuple(values)):
                 if isinstance(it, GroupChange):
                     if it.warning_sensitive:
-                        style = {"code": True}
+                        style: JSON = {"style": {"code": True}}
                     elif it.warning_mandatory:
-                        style = {"bold": True}
+                        style: JSON = {"style": {"bold": True}}
                     else:
-                        style = {}
+                        style: JSON = {}
 
                     yield {"type": "text", "text": it.group, **style}
                 else:
@@ -182,6 +182,7 @@ class SlackNotifier:
                     url,
                     result.status_code,
                 )
+                self._log.error("for request %s", data)
                 any_errors = True
 
         return not any_errors
