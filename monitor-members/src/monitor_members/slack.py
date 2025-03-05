@@ -146,11 +146,14 @@ class SlackNotifier:
 
             for it in pretty_list_t(tuple(values)):
                 if isinstance(it, GroupChange):
-                    yield {
-                        "type": "text",
-                        "text": it.group,
-                        "style": {"bold": it.warning},
-                    }
+                    if it.warning_sensitive:
+                        style = {"code": True}
+                    elif it.warning_mandatory:
+                        style = {"bold": True}
+                    else:
+                        style = {}
+
+                    yield {"type": "text", "text": it.group, **style}
                 else:
                     yield {"type": "text", "text": it}
 

@@ -32,9 +32,15 @@ class GroupChange:
 
     @property
     def warning(self) -> bool:
-        return (self.group_type == GroupType.SENSITIVE) or (
-            self.group_type == GroupType.MANDATORY and ChangeType.DEL in self.changes
-        )
+        return self.warning_sensitive or self.warning_mandatory
+
+    @property
+    def warning_sensitive(self) -> bool:
+        return self.group_type == GroupType.SENSITIVE
+
+    @property
+    def warning_mandatory(self) -> bool:
+        return self.group_type == GroupType.MANDATORY and ChangeType.DEL in self.changes
 
 
 class Database:
