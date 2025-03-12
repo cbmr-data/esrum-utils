@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -167,7 +167,8 @@ def main(args: Args) -> int:
                 break
 
             try:
-                log.info("Next loop in %i minutes", args.interval)
+                wake_at = datetime.now() + timedelta(seconds=loop_interval)
+                log.info("Next loop at %s", wake_at)
                 time.sleep(loop_interval)
             except KeyboardInterrupt:
                 break
