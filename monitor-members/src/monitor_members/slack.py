@@ -85,17 +85,28 @@ class SlackNotifier:
         user_list = " ".join(sorted(users))
         n = len(users)
 
+        if len(users) == 1:
+            command = (
+                "sudo sacctmgr -i create user name={user_list} cluster={cluster} "
+                f"account={account}; done"
+            )
+        else:
+            command = (
+                f"for user in {user_list};do sudo sacctmgr -i create user "
+                "name=${{user}} cluster={cluster} account={account}; done"
+            )
+
         return self._send_message(
             [
                 {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f":warning: {n} user(s) missing from sacctmgr: Add "
-                        f"with `for user in {user_list};do sudo sacctmgr -i create "
-                        f"user name=${{user}} cluster={cluster} account={account};"
-                        "done`\n*Please react to this message before running the "
-                        "command!*",
+                        "text": (
+                            f":warning: {n} user(s) missing from sacctmgr: Add with\n"
+                            f"`{command}`\n"
+                            "*Please react to this message before running the command!*"
+                        ),
                     },
                 }
             ]
