@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 
 from monitor_members.common import run_subprocess
@@ -70,9 +71,15 @@ class LDAP:
             proc.log_stderr(self._log)
             return None
 
+        lines: list[str] = []
+
         attr = f"{attr}: "
-        return [
-            line[len(attr) :].strip()
-            for line in proc.stdout.splitlines()
-            if line.startswith(attr)
-        ]
+        attr_b64 = f"{attr}:: "
+        for line in proc.stdout.splitlines():
+            if line.startswith(attr):
+                lines.append(line[len(attr) :].strip())
+            elif line.startswith(attr_b64):
+                value = line[len(attr_b64) :].strip()
+                lines.append(base64.b64decode(value).decode("utf-8", errors="replace"))
+
+        return lines
