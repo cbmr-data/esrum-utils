@@ -1,0 +1,13 @@
+# Location to monitor
+root = "..."
+
+# "Database" in which folder statistics are stored between runs
+database = "database.txt"
+
+# SMTP server for sending notifications
+smtp_server = "..."
+
+# Email addresses to be sent notifications when `root` changes
+email_recipients = [
+	"..."
+]
