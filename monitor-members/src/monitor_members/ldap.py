@@ -73,13 +73,13 @@ class LDAP:
 
         lines: list[str] = []
 
-        attr = f"{attr}: "
-        attr_b64 = f"{attr}:: "
+        attr_key_b64 = f"{attr}:: "
+        attr_key = f"{attr}: "
         for line in proc.stdout.splitlines():
-            if line.startswith(attr):
-                lines.append(line[len(attr) :].strip())
-            elif line.startswith(attr_b64):
-                value = line[len(attr_b64) :].strip()
+            if line.startswith(attr_key):
+                lines.append(line[len(attr_key) :].strip())
+            elif line.startswith(attr_key_b64):
+                value = line[len(attr_key_b64) :].strip()
                 lines.append(base64.b64decode(value).decode("utf-8", errors="replace"))
 
         return lines
