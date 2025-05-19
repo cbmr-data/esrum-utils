@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Iterable, Iterator, Literal
 
 import typed_argparse as tap
 from sqlalchemy import create_engine, select
@@ -56,7 +56,7 @@ class SystemUtilizationColumns:
 
         idle_processes: dict[datetime, float] = defaultdict(float)
         result = SystemUtilizationColumns()
-        for u, ts, ac in zip(self.user, self.time_start, self.average_cpu, strict=True):
+        for u, ts, ac in self:
             if u in active_users or u.startswith("<"):
                 result.user.append(u)
                 result.time_start.append(ts)
@@ -70,6 +70,15 @@ class SystemUtilizationColumns:
             result.average_cpu.append(ac)
 
         return result
+
+    def __iter__(self) -> Iterator[tuple[str, datetime, float]]:
+        return zip(
+            self.user,
+            self.time_start,
+            self.time_end,
+            self.average_cpu,
+            strict=True,
+        )
 
 
 class Args(tap.TypedArgs):
@@ -108,6 +117,16 @@ def main(args: Args) -> None:
     with Session(engine) as session:
         report = Report("Server utilization")
 
+        users = {
+            user
+            for (user,) in session.execute(
+                select(ProcUtilization.user).where(ProcUtilization.user != None)
+            )
+        }
+        users.add("<system>")
+        users.add("<idle users>")
+        colors = usernames_to_colors(users)
+
         days: dict[date, SystemUtilizationColumns] = defaultdict(
             SystemUtilizationColumns
         )
@@ -117,19 +136,21 @@ def main(args: Args) -> None:
                 ProcUtilization.user,
                 ProcUtilization.time_start,
                 ProcUtilization.average_cpu,
-            ).where(ProcUtilization.group == None)  # noqa: E711
-        ).unique():
+            )
+            .where(
+                ProcUtilization.group == None,  # noqa: E711
+                ProcUtilization.time_start
+                >= datetime.now().replace(hour=8, minute=0, second=0),
+            )
+            .order_by(ProcUtilization.time_start)
+        ):
             it = days[time_start.date()]
             it.user.append("<system>" if user is None else user)
             it.time_start.append(time_start)
             it.average_cpu.append(average_cpu)
 
-        users: set[str] = set()
         for day, columns in days.items():
             days[day] = columns.flatten_idle_users()
-            users.update(days[day].user)
-
-        colors = usernames_to_colors(users)
 
         s = report.add()
         for day, columns in sorted(days.items()):
@@ -139,7 +160,7 @@ def main(args: Args) -> None:
                     "time_start": columns.time_start,
                     "average_cpu": columns.average_cpu,
                 }
-            )
+            ).sort_values(by=["user", "time_start"])
 
             df["average_cpu"] = df["average_cpu"].round(3)
 
@@ -155,7 +176,7 @@ def main(args: Args) -> None:
                     title=day.strftime("%Y-%m-%d (%A)"),
                 )
                 .mark_area(
-                    interpolate="step-after",
+                    interpolate="step",
                 )
                 .encode(
                     x="time_start",

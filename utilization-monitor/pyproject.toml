@@ -40,8 +40,6 @@ target-version = "py39"
 select = ["ALL"]
 
 ignore = [
-    "ANN101",  # missing-type-self
-    "ANN102",  # missing-type-cls
     "C90",     # mccabe
     "COM",     # Commmas
     "CPY",     # missing-copyright-notice
@@ -56,9 +54,9 @@ ignore = [
     "T203",    # flake8-print
     "TRY",     # tryceratops
     # Try to avoid TYPE_CHECKING blocks to unify runtime/typechecking logic
-    "TCH001", # typing-only-first-party-import
-    "TCH002", # typing-only-third-party-import
-    "TCH003", # typing-only-standard-library-import
+    "TC001", # typing-only-first-party-import
+    "TC002", # typing-only-third-party-import
+    "TC003", # typing-only-standard-library-import
 ]
 
 [project.scripts]
