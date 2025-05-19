@@ -1,0 +1,35 @@
+#!/usr/bin/env python3.9
+# pyright: strict
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+VERSION = "v3"
+ROOT = Path(__file__).parent
+
+
+def main(argv: list[str]) -> int:
+    executable = shutil.which("singularity")
+    if not executable:
+        print("ERROR: `singularity` not found in PATH!", file=sys.stderr)
+        print("       Remember to run `module load singularity`", file=sys.stderr)
+        return 1
+
+    return subprocess.call(
+        [
+            executable,
+            "run",
+            "--cleanenv",
+            "--bind",
+            "/maps,/projects,/datasets,/scratch",
+            ROOT / "build" / f"ic_fond-{VERSION}.sif",
+            *argv,
+        ]
+    )
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
