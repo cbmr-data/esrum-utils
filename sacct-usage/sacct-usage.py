@@ -24,7 +24,7 @@ _STATE_WHITELIST = frozenset(
     ("COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL", "PREEMPTED", "TIMEOUT")
 )
 
-__VERSION__ = (2024, 8, 29, 1)
+__VERSION__ = (2025, 5, 22, 1)
 __VERSION_STR__ = "{}{:02}{:02}.{}".format(*__VERSION__)
 
 
@@ -146,6 +146,7 @@ def print_table(
 class Usage:
     job: str
     user: str
+    name: str
     cpus: int
     cpu_total: float
     mem: float
@@ -216,6 +217,7 @@ def parse_usage(text: str) -> list[Usage]:
             jobs[jobid] = Usage(
                 job=jobid,
                 user=row["User"],
+                name=row["JobName"],
                 cpus=cpus,
                 cpu_total=cpu_total,
                 mem=parse_requested_mem_to_mb(row["ReqMem"], cpus),
@@ -407,7 +409,8 @@ def main(argv: list[str]) -> int:
     command = [
         "sacct",
         "--parsable2",
-        "--format=JobID,AllocCPUS,Elapsed,MaxRSS,MaxRSS,ReqMem,State,TotalCPU,User,End",
+        "--format=JobID,AllocCPUS,Elapsed,MaxRSS,MaxRSS,ReqMem,State,TotalCPU,User,End,"
+        "JobName",
     ]
 
     if args.start_time is not None:
@@ -482,6 +485,7 @@ def main(argv: list[str]) -> int:
                 {
                     "Age": it.age,
                     "User": it.user,
+                    "Name": it.name,
                     "Job": it.job,
                     "State": it.state,
                     "Elapsed": it.elapsed,
@@ -514,6 +518,7 @@ def main(argv: list[str]) -> int:
         "ExtraMem": "{:.1f}",
         "ExtraMemWasted": "{:.1f}",
         "CPUHoursWasted": "{:.2f}",
+        "Name": "{}",
     }
 
     sort_table(
