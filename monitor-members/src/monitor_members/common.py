@@ -94,6 +94,7 @@ def run_subprocess(
     log: logging.Logger,
     command: list[str] | list[str | Path],
 ) -> CommandOutput:
+    log.debug("Running command %s", command)
     if not command:
         raise ValueError(command)
 

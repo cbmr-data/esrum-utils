@@ -49,6 +49,11 @@ class Sacct:
     cluster: str
     account: str
 
+    # Command to execute when a member has been added from the LDAP group
+    add_member: list[str] = dataclasses.field(default_factory=list[str])
+    # Command to execute when a member has been removed from the LDAP group
+    remove_member: list[str] = dataclasses.field(default_factory=list[str])
+
 
 @dataclasses.dataclass
 class Config:
