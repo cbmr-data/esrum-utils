@@ -4,18 +4,18 @@ import sys
 
 import typed_argparse as tap
 
-from monitor_members.commands import monitor, refresh, sacct
+from monitor_members.commands import ldap, refresh, sacct
 
 
 def main_w() -> None:
     tap.Parser(
         tap.SubParserGroup(
-            tap.SubParser("monitor", monitor.Args),
+            tap.SubParser("ldap", ldap.Args),
             tap.SubParser("refresh", refresh.Args),
             tap.SubParser("sacct", sacct.Args),
         ),
     ).bind(
-        monitor.main,
+        ldap.main,
         refresh.main,
         sacct.main,
     ).run(sys.argv[1:])
