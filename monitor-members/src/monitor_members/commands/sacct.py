@@ -45,6 +45,12 @@ class Args(tap.TypedArgs):
         help="Path to TOML configuration file",
     )
 
+    interval: int = tap.arg(
+        metavar="N",
+        default=0,
+        help="Repeat monitoring steps every N minutes, if value is greater than 0",
+    )
+
     ####################################################################################
     # Executables
 
@@ -122,25 +128,30 @@ def main(args: Args) -> int:
         return 1
 
     manager = Sacctmgr(cluster=sacct.cluster, account=sacct.account)
-    sacct_members = manager.get_associations()
-    if sacct_members is None:
-        log.error("failed to get sacct members")
-        return 1
 
-    updates: tuple[tuple[str, list[str], set[str]], ...] = (
-        ("added", sacct.add_member, ldap_members - sacct_members),
-        ("removed", sacct.remove_member, sacct_members - ldap_members),
-    )
+    # loop intervals in seconds
+    loop_interval = args.interval * 60
 
-    for desc, cmd_template, users in updates:
-        for user in sorted(users):
-            log.info("%s user %r", desc, user)
+    for _ in kerb.authenticated_loop(loop_interval):
+        sacct_members = manager.get_associations()
+        if sacct_members is None:
+            log.error("failed to get sacct members")
+            return 1
 
-            if cmd_template:
-                command = update_command(cmd_template, {**fields, "{user}": user})
-                if not (proc := run_subprocess(log, command)):
-                    log.error("Failed to run command:")
-                    proc.log_stderr(log)
-                    return 1
+        updates: tuple[tuple[str, list[str], set[str]], ...] = (
+            ("added", sacct.add_member, ldap_members - sacct_members),
+            ("removed", sacct.remove_member, sacct_members - ldap_members),
+        )
 
-    return 0
+        for desc, cmd_template, users in updates:
+            for user in sorted(users):
+                log.info("%s user %r", desc, user)
+
+                if cmd_template:
+                    command = update_command(cmd_template, {**fields, "{user}": user})
+                    if not (proc := run_subprocess(log, command)):
+                        log.error("Failed to run command:")
+                        proc.log_stderr(log)
+                        return 1
+
+    return 0 if kerb else 1

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import time
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -102,34 +100,21 @@ def main(args: Args) -> int:
         # loop intervals in seconds
         loop_interval = args.interval * 60
 
-        while True:
-            if kerb.refresh():
-                if not database.update_ldap_groups():
-                    log.error("could not update group memberships")
-                    return 1
+        for _ in kerb.authenticated_loop(loop_interval):
+            if not database.update_ldap_groups():
+                log.error("could not update group memberships")
+                return 1
 
-                if changes := database.unreported_updates():
-                    for change in changes:
-                        if change.user not in displaynames:
-                            displaynames[change.user] = ldap.display_name(change.user)
+            if changes := database.unreported_updates():
+                for change in changes:
+                    if change.user not in displaynames:
+                        displaynames[change.user] = ldap.display_name(change.user)
 
-                    report_sent = notifier.send_ldap_notification(
-                        displaynames=displaynames,
-                        changes=changes,
-                    )
+                report_sent = notifier.send_ldap_notification(
+                    displaynames=displaynames,
+                    changes=changes,
+                )
 
-                    database.add_report(kind=ReportKind.LDAP, success=report_sent)
-            else:
-                log.error("unable to check group memberships; sleeping")
+                database.add_report(kind=ReportKind.LDAP, success=report_sent)
 
-            if args.interval <= 0:
-                break
-
-            try:
-                wake_at = datetime.now() + timedelta(seconds=loop_interval)
-                log.info("Next loop at %s", wake_at)
-                time.sleep(loop_interval)
-            except KeyboardInterrupt:
-                break
-
-    return 0
+    return 0 if kerb else 1
