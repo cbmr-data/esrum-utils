@@ -6,17 +6,23 @@ from monitor_members.common import run_subprocess
 
 
 class Sacctmgr:
-    __slots__ = ["_account", "_cluster", "_log"]
+    __slots__ = ["_account", "_cluster", "_executable", "_log"]
 
-    def __init__(self, cluster: str, account: str) -> None:
-        self._cluster = cluster.lower()
+    def __init__(
+        self,
+        cluster: str,
+        account: str,
+        executable: str = "sacctmgr",
+    ) -> None:
         self._account = account.lower()
+        self._cluster = cluster.lower()
+        self._executable = executable
         self._log = logging.getLogger("sacct")
 
     def get_associations(self) -> set[str] | None:
         proc = run_subprocess(
             self._log,
-            ["sacctmgr", "list", "Association", "--parsable2"],
+            [self._executable, "list", "Association", "--parsable2"],
         )
 
         if not proc:

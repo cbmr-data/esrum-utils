@@ -27,6 +27,16 @@ class Args(tap.TypedArgs):
         help="Optional path to kinit executable",
     )
 
+    ldapsearch_exe: str = tap.arg(
+        default=which("ldapsearch"),
+        help="Optional path to ldapsearch executable",
+    )
+
+    sacctmgr_exe: str = tap.arg(
+        default=which("sacctmgr"),
+        help="Optional path to sacctmgr executable",
+    )
+
     ####################################################################################
     # Logging
 
@@ -68,6 +78,7 @@ def main(args: Args) -> int:
     ldap = LDAP(
         uri=conf.ldap.uri,
         searchbase=conf.ldap.searchbase,
+        ldapsearch_exe=args.ldapsearch_exe,
     )
 
     ldap_members = ldap.members(sacct.ldap_group)
