@@ -87,13 +87,13 @@ class SlackNotifier:
 
         if len(users) == 1:
             command = (
-                "sudo sacctmgr -i create user name={user_list} cluster={cluster} "
+                f"sudo sacctmgr -i create user name={user_list} cluster={cluster} "
                 f"account={account}; done"
             )
         else:
             command = (
                 f"for user in {user_list};do sudo sacctmgr -i create user "
-                "name=${{user}} cluster={cluster} account={account}; done"
+                f"name=${{user}} cluster={cluster} account={account}; done"
             )
 
         return self._send_message(
@@ -160,9 +160,9 @@ class SlackNotifier:
                     if it.warning_sensitive:
                         style: JSON = {"style": {"code": True}}
                     elif it.warning_mandatory:
-                        style: JSON = {"style": {"bold": True}}
+                        style = {"style": {"bold": True}}
                     else:
-                        style: JSON = {}
+                        style = {}
 
                     yield {"type": "text", "text": it.group, **style}
                 else:
