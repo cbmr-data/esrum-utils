@@ -25,7 +25,7 @@ _LOG = logging.getLogger("config")
 
 @dataclasses.dataclass
 class Slack:
-    urls: list[str] = dataclasses.field(default_factory=list)
+    urls: list[str] = dataclasses.field(default_factory=list[str])
 
 
 @dataclasses.dataclass
@@ -38,9 +38,9 @@ class Kerberos:
 class LDAP:
     uri: str
     searchbase: str
-    sensitive_groups: list[str] = dataclasses.field(default_factory=list)
-    mandatory_groups: list[str] = dataclasses.field(default_factory=list)
-    groups: list[str] = dataclasses.field(default_factory=list)
+    sensitive_groups: list[str] = dataclasses.field(default_factory=list[str])
+    mandatory_groups: list[str] = dataclasses.field(default_factory=list[str])
+    groups: list[str] = dataclasses.field(default_factory=list[str])
 
 
 @dataclasses.dataclass

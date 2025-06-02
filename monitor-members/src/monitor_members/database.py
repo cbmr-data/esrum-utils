@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Self
 
 import sqlalchemy
-import sqlalchemy.exc
 import sqlalchemy.orm
 
 from monitor_members.groups import GroupType

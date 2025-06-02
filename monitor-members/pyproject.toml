@@ -34,6 +34,7 @@ ignore = [
     "COM",     # Commmas
     "CPY",     # missing-copyright-notice
     "D",       # Docstrings
+    "DTZ",     # flake8-datetimez
     "EM",      # flake8-errmsg
     "PLR09",   # pylint: too-many-*
     "PLR1702", # pylint: too-many-nested-blocks
@@ -60,6 +61,4 @@ path = "src/monitor_members/__init__.py"
 reinstall-package = ["paleomix"]
 
 [dependency-groups]
-dev = [
-    "nox>=2024.10.9",
-]
+dev = ["nox>=2024.10.9"]
