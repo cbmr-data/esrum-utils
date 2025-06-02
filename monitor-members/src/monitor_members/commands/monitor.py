@@ -13,8 +13,7 @@ from monitor_members.database import Database
 from monitor_members.groups import GroupType, collect_groups
 from monitor_members.kerberos import Kerberos
 from monitor_members.ldap import LDAP
-from monitor_members.models import ReportKind, timestamp
-from monitor_members.sacctmgr import Sacctmgr
+from monitor_members.models import ReportKind
 from monitor_members.slack import SlackNotifier
 
 
@@ -29,13 +28,6 @@ class Args(tap.TypedArgs):
         metavar="N",
         default=0,
         help="Repeat monitoring steps every N minutes, if value is greater than 0",
-    )
-
-    sacct_interval: int = tap.arg(
-        metavar="N",
-        default=24 * 60,
-        help="Report missing sacctmgr users no more frequently than every N minutes. "
-        "This interval should be divisible by --interval",
     )
 
     ####################################################################################
@@ -91,15 +83,6 @@ def main(args: Args) -> int:
         ldapsearch_exe=args.ldapsearch_exe,
     )
 
-    if conf.sacct is None:
-        log.warning("Sacct account monitoring disabled")
-        sacct = None
-    else:
-        sacct = Sacctmgr(
-            cluster=conf.sacct.cluster,
-            account=conf.sacct.account,
-        )
-
     notifier = SlackNotifier(
         webhooks=conf.slack.urls,
         timeout=60,
@@ -118,7 +101,6 @@ def main(args: Args) -> int:
 
         # loop intervals in seconds
         loop_interval = args.interval * 60
-        sacct_interval = timedelta(minutes=args.sacct_interval)
 
         while True:
             if kerb.refresh():
@@ -137,29 +119,6 @@ def main(args: Args) -> int:
                     )
 
                     database.add_report(kind=ReportKind.LDAP, success=report_sent)
-
-                if sacct is not None and conf.sacct is not None:
-                    last_report = database.last_succesful_report(ReportKind.SACCT)
-
-                    if (
-                        last_report is None
-                        or (last_report - timestamp()) >= sacct_interval
-                    ):
-                        log.info("Checking for membership in sacctmgr")
-
-                        if (sacct_users := sacct.get_associations()) is not None:
-                            ldap_users = database.get_users(conf.sacct.ldap_group)
-                            if missing_users := ldap_users.difference(sacct_users):
-                                report_sent = notifier.send_sacct_message(
-                                    users=missing_users,
-                                    cluster=conf.sacct.cluster,
-                                    account=conf.sacct.account,
-                                )
-
-                                database.add_report(
-                                    kind=ReportKind.SACCT,
-                                    success=report_sent,
-                                )
             else:
                 log.error("unable to check group memberships; sleeping")
 
