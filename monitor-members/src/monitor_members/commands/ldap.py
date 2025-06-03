@@ -97,10 +97,12 @@ def main(args: Args) -> int:
         # display names are assumed to be unchanging over the runtime of the script
         displaynames: dict[str, str | None] = {}
 
-        # loop intervals in seconds
-        loop_interval = args.interval * 60
-
-        for _ in kerb.authenticated_loop(loop_interval):
+        for _ in kerb.authenticated_loop(
+            # loop intervals in seconds
+            interval=args.interval * 60,
+            notifier=notifier,
+            what="Monitoring LDAP group members",
+        ):
             if not database.update_ldap_groups():
                 log.error("could not update group memberships")
                 return 1

@@ -70,31 +70,13 @@ class SlackNotifier:
 
         return self._send_message(blocks)
 
-    def send_sacct_message(
-        self,
-        *,
-        users: Iterable[str],
-        cluster: str,
-        account: str,
-    ) -> bool:
+    def send_error_message(self, *, what: str, stderr: str = "") -> bool:
         if not self._webhooks:
-            self._log.warning("Slack sacct update not sent; no webhooks configured")
+            self._log.warning("Error message not sent; no webhooks configured")
             return False
 
-        users = list(users)
-        user_list = " ".join(sorted(users))
-        n = len(users)
-
-        if len(users) == 1:
-            command = (
-                f"sudo sacctmgr -i create user name={user_list} cluster={cluster} "
-                f"account={account}; done"
-            )
-        else:
-            command = (
-                f"for user in {user_list};do sudo sacctmgr -i create user "
-                f"name=${{user}} cluster={cluster} account={account}; done"
-            )
+        if stderr := stderr.strip():
+            stderr = f":\n```\n{stderr}\n```"
 
         return self._send_message(
             [
@@ -102,11 +84,7 @@ class SlackNotifier:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": (
-                            f":warning: {n} user(s) missing from sacctmgr: Add with\n"
-                            f"`{command}`\n"
-                            "*Please react to this message before running the command!*"
-                        ),
+                        "text": f":warning: {what}{stderr}",
                     },
                 }
             ]

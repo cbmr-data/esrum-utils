@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from datetime import datetime, timedelta
 
 from monitor_members.common import quote, run_subprocess
+from monitor_members.slack import SlackNotifier
 
 __all__ = [
     "Kerberos",
@@ -26,10 +27,16 @@ class Kerberos:
         self._kinit_exe = kinit_exe
         self._authenticated = False
 
-    def refresh(self) -> bool:
+    def refresh(
+        self,
+        *,
+        notifier: SlackNotifier | None = None,
+        what: str = "Refreshing kerberos ticket",
+    ) -> bool:
         """Attempts to refresh the current ticket, if any, or create a new ticket using
         the supplied keytab. Returns true if either succeeds."""
 
+        was_authenticated = self._authenticated
         self._authenticated = False
 
         # Attempt to renew existing ticket (if any)
@@ -42,6 +49,13 @@ class Kerberos:
                 if not (proc := run_subprocess(self._log, command)):
                     self._log.error("failed to generate kerberos ticket:")
                     proc.log_stderr(self._log)
+
+                    if was_authenticated and notifier:
+                        notifier.send_error_message(
+                            what=f"{what}: Failed to generate ticket from keytab",
+                            stderr=proc.stderr,
+                        )
+
                     return False
 
                 self._log.info("generated new kerberos ticket")
@@ -49,21 +63,30 @@ class Kerberos:
                 return True
             else:
                 self._log.warning("keytab and username required to generate ticket")
+                if was_authenticated and notifier:
+                    notifier.send_error_message(
+                        what=f"{what}: Could not refresh kerberos ticket and no "
+                        "keytab file was provided/configured",
+                    )
+
                 return False
 
         self._log.info("refreshed existing kerberos ticket")
         self._authenticated = True
         return True
 
-    def authenticated_loop(self, interval: float) -> Iterator[None]:
+    def authenticated_loop(
+        self,
+        *,
+        interval: float,
+        notifier: SlackNotifier | None = None,
+        what: str = "Refreshing kerberos ticket",
+    ) -> Iterator[None]:
         while True:
-            if self.refresh():
+            if self.refresh(notifier=notifier, what=what):
                 yield None
-            elif interval > 0:
-                self._log.warning("unable to check group memberships")
             else:
-                self._log.error("unable to check group memberships; aborting")
-                break
+                self._log.warning("unable to check group memberships")
 
             if interval <= 0:
                 break

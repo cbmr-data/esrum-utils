@@ -12,6 +12,7 @@ from monitor_members.config import Config
 from monitor_members.kerberos import Kerberos
 from monitor_members.ldap import LDAP
 from monitor_members.sacctmgr import Sacctmgr
+from monitor_members.slack import SlackNotifier
 
 
 def validate_commands(
@@ -112,14 +113,16 @@ def main(args: Args) -> int:
         kinit_exe=args.kinit_exe,
     )
 
-    if not kerb.refresh():
-        log.error("no kerberos ticket available; unable to determine current users")
-        return 1
-
     ldap = LDAP(
         uri=conf.ldap.uri,
         searchbase=conf.ldap.searchbase,
         ldapsearch_exe=args.ldapsearch_exe,
+    )
+
+    notifier = SlackNotifier(
+        webhooks=conf.slack.urls,
+        timeout=60,
+        verbose=True,
     )
 
     ldap_members = ldap.members(sacct.ldap_group)
@@ -129,10 +132,12 @@ def main(args: Args) -> int:
 
     manager = Sacctmgr(cluster=sacct.cluster, account=sacct.account)
 
-    # loop intervals in seconds
-    loop_interval = args.interval * 60
-
-    for _ in kerb.authenticated_loop(loop_interval):
+    for _ in kerb.authenticated_loop(
+        # loop intervals in seconds
+        interval=args.interval * 60,
+        notifier=notifier,
+        what="Monitoring SACCT members",
+    ):
         sacct_members = manager.get_associations()
         if sacct_members is None:
             log.error("failed to get sacct members")
