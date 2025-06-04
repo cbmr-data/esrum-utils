@@ -144,19 +144,24 @@ def main(args: Args) -> int:
             return 1
 
         updates: tuple[tuple[str, list[str], set[str]], ...] = (
-            ("added", sacct.add_member, ldap_members - sacct_members),
-            ("removed", sacct.remove_member, sacct_members - ldap_members),
+            ("add", sacct.add_member, ldap_members - sacct_members),
+            ("remov", sacct.remove_member, sacct_members - ldap_members),
         )
 
         for desc, cmd_template, users in updates:
             for user in sorted(users):
-                log.info("%s user %r", desc, user)
-
                 if cmd_template:
                     command = update_command(cmd_template, {**fields, "{user}": user})
-                    if not (proc := run_subprocess(log, command)):
+                    log.info("%sing user %s with command %s", desc, user, command)
+                    if proc := run_subprocess(log, command):
+                        if stdout := proc.stdout.rstrip():
+                            for line in stdout.split():
+                                log.info("  > %s", line.rstrip())
+                    else:
                         log.error("Failed to run command:")
                         proc.log_stderr(log)
                         return 1
+                else:
+                    log.info("%sed user %r", desc, user)
 
     return 0 if kerb else 1
