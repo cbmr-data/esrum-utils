@@ -33,8 +33,8 @@ def abort(*args: object) -> NoReturn:
     sys.exit(1)
 
 
-def quote(name: object) -> str:
-    return shlex.quote(str(name))
+def quote(*values: object) -> str:
+    return " ".join(shlex.quote(str(value)) for value in values)
 
 
 def which(name: str) -> str:

@@ -7,7 +7,13 @@ from typing import Literal
 
 import typed_argparse as tap
 
-from monitor_members.common import main_func, run_subprocess, setup_logging, which
+from monitor_members.common import (
+    main_func,
+    quote,
+    run_subprocess,
+    setup_logging,
+    which,
+)
 from monitor_members.config import Config
 from monitor_members.kerberos import Kerberos
 from monitor_members.ldap import LDAP
@@ -152,7 +158,7 @@ def main(args: Args) -> int:
             for user in sorted(users):
                 if cmd_template:
                     command = update_command(cmd_template, {**fields, "{user}": user})
-                    log.info("%sing user %s with command %s", desc, user, command)
+                    log.info("%sing %s with command %s", desc, user, quote(*command))
                     if proc := run_subprocess(log, command):
                         if stdout := proc.stdout.rstrip():
                             for line in stdout.splitlines():
