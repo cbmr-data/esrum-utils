@@ -155,7 +155,7 @@ def main(args: Args) -> int:
                     log.info("%sing user %s with command %s", desc, user, command)
                     if proc := run_subprocess(log, command):
                         if stdout := proc.stdout.rstrip():
-                            for line in stdout.split():
+                            for line in stdout.splitlines():
                                 log.info("  > %s", line.rstrip())
                     else:
                         log.error("Failed to run command:")
