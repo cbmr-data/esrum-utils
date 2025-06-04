@@ -5,7 +5,7 @@ from typing import Literal
 
 import typed_argparse as tap
 
-from monitor_members.common import main_func, setup_logging, which
+from monitor_members.common import main_func, parse_duration, setup_logging, which
 from monitor_members.config import Config
 from monitor_members.database import Database
 from monitor_members.groups import GroupType, collect_groups
@@ -22,10 +22,12 @@ class Args(tap.TypedArgs):
         help="Path to TOML configuration file",
     )
 
-    interval: int = tap.arg(
+    interval: float = tap.arg(
+        type=parse_duration,
         metavar="N",
         default=0,
-        help="Repeat monitoring steps every N minutes, if value is greater than 0",
+        help="Repeat monitoring steps every N seconds, if value is greater than 0. "
+        "Accepts units 'd', 'h', 'm', and 's', for days, hours, minutes and seconds",
     )
 
     ####################################################################################
@@ -98,8 +100,7 @@ def main(args: Args) -> int:
         displaynames: dict[str, str | None] = {}
 
         for _ in kerb.authenticated_loop(
-            # loop intervals in seconds
-            interval=args.interval * 60,
+            interval=args.interval,
             notifier=notifier,
             what="Monitoring LDAP group members",
         ):

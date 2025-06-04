@@ -44,6 +44,19 @@ def which(name: str) -> str:
     return name
 
 
+def parse_duration(value: str) -> float:
+    mult = 1
+
+    value = value.lower()
+    for key, seconds in (("d", 24 * 60 * 60), ("h", 60 * 60), ("m", 60), ("s", 1)):
+        if value.endswith(key):
+            value = value[:-1]
+            mult = seconds
+            break
+
+    return float(value) * mult
+
+
 def setup_logging(
     name: str,
     *,
