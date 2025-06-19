@@ -356,6 +356,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--start-time",
         dest="start_time",
         metavar="TIME",
+        default="now-24hours",
         help="Show tasks starting at this time; see `man sacct` for format",
     )
     parser.add_argument(
@@ -364,6 +365,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--end-time",
         metavar="TIME",
         dest="end_time",
+        default="now",
         help="Show tasks ending at this time; see `man sacct` for format",
     )
     parser.add_argument(
@@ -388,6 +390,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         metavar="job(.step)",
         dest="jobs",
         help="Show only the specified jobs; see `man sacct`",
+    )
+
+    parser.add_argument(
+        "-s",
+        "--state",
+        metavar="state_list",
+        dest="state",
+        help="Show only jobs with the specified state(s); see `man sacct`",
     )
 
     return parser.parse_args(argv)
@@ -429,10 +439,8 @@ def main(argv: list[str]) -> int:
         command.append(f"--group={args.group}")
     if args.jobs is not None:
         command.append(f"--jobs={args.jobs}")
-
-    # Default to showing something more useful
-    if args.start_time is None and args.jobs is None:
-        command.append("--starttime=now-24hours")
+    if args.state is not None:
+        command.append(f"--state={args.state}")
 
     proc = subprocess.Popen(
         command,
