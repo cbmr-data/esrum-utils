@@ -471,7 +471,7 @@ def main(argv: list[str]) -> int:
 
             if it.has_measurements:
                 wasted_cpus = it.cpus * (1.0 - it.cpu_utilization)
-                wasted_mem = it.mem - it.mem_total
+                wasted_mem = max(0, it.mem - it.mem_total)
                 wasted_extra_mem = max(
                     0, it.mem - max(it.mem_total, it.cpus * _DEFAULT_MEM_PER_CPU)
                 )
