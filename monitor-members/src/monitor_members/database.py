@@ -181,6 +181,8 @@ class Database:
             if ldap_users is None:
                 self._log.error("failed to get LDAP members for %r", group_name)
                 return False
+            elif not (ldap_users or current_users):
+                self._log.warning("no members in LDAP group %r", group_name)
 
             for username in sorted(ldap_users - set(current_users)):
                 self._log.info("adding user to group %r: %r", group_name, username)
