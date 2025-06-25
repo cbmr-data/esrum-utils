@@ -261,7 +261,14 @@ def sort_table(
     else:
         abort(f"ERROR: Sort key {sort_key!r} does not exit!")
 
-    table.sort(key=lambda it: it[sort_key], reverse=reverse_sort)
+    def sort_with_na(row: dict[str, str | int | float]) -> str | int | float:
+        value = row[sort_key]
+        if isinstance(value, float) and math.isnan(value):
+            return -math.inf
+
+        return value
+
+    table.sort(key=sort_with_na, reverse=reverse_sort)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
