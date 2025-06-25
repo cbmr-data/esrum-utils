@@ -24,7 +24,7 @@ _STATE_WHITELIST = frozenset(
     ("COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL", "PREEMPTED", "TIMEOUT")
 )
 
-__VERSION__ = (2025, 5, 22, 1)
+__VERSION__ = (2025, 6, 25, 1)
 __VERSION_STR__ = "{}{:02}{:02}.{}".format(*__VERSION__)
 
 
@@ -116,6 +116,9 @@ def print_table(
                 max(width, 0 if isinstance(it, int) else len(it))
                 for width, it in zip_longest(widths, row, fillvalue=0)
             ]
+
+        # The final column should not be padded
+        widths[-1] = 0
 
         padded_table: list[list[str]] = []
         for row in table:
