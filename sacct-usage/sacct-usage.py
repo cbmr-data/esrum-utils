@@ -24,7 +24,7 @@ _STATE_WHITELIST = frozenset(
     ("COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL", "PREEMPTED", "TIMEOUT")
 )
 
-__VERSION__ = (2025, 6, 25, 1)
+__VERSION__ = (2025, 6, 26, 1)
 __VERSION_STR__ = "{}{:02}{:02}.{}".format(*__VERSION__)
 
 
@@ -87,7 +87,7 @@ def parse_rss_to_mb(value: str) -> float:
     elif value.endswith("M"):
         return float(value[:-1])
 
-    raise ValueError(value)
+    return float(value)
 
 
 #######################################################################################
@@ -336,10 +336,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--column-separator",
-        default="spaces",
+        default="auto",
         help="Character or characters to use to separate columns in the output. "
         "Possible values are 'spaces', 'commas', or any single character. By "
-        "default columns are aligned using spaces for readability",
+        "default columns are aligned using spaces when outputting to a terminal, "
+        "and tabs when outputting to a pipe",
     )
 
     group = parser.add_mutually_exclusive_group()
@@ -416,15 +417,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     if len(args.column_separator) != 1 and args.column_separator not in (
+        "auto",
         "tab",
         "tabs",
         "space",
         "spaces",
     ):
         abort(
-            "Invalid --column-separator option; must be 'tabs', 'spaces', or a single "
+            "Invalid --column-separator option; must be 'auto', 'tabs', 'spaces', or a single "
             f"character, not {args.column_separator!r}!"
         )
+    elif args.column_separator == "auto":
+        args.column_separator = "spaces" if sys.stdout.isatty() else "tabs"
 
     command = [
         "sacct",
