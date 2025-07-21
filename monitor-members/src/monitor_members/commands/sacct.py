@@ -134,11 +134,6 @@ def main(args: Args) -> int:
         verbose=True,
     )
 
-    ldap_members = ldap.members(sacct.ldap_group)
-    if ldap_members is None:
-        log.error("failed to get members of LDAP group %r", sacct.ldap_group)
-        return 1
-
     manager = Sacctmgr(cluster=sacct.cluster, account=sacct.account)
 
     for _ in kerb.authenticated_loop(
@@ -146,6 +141,11 @@ def main(args: Args) -> int:
         notifier=notifier,
         what="Monitoring SACCT members",
     ):
+        ldap_members = ldap.members(sacct.ldap_group)
+        if ldap_members is None:
+            log.error("failed to get members of LDAP group %r", sacct.ldap_group)
+            return 1
+
         sacct_members = manager.get_associations()
         if sacct_members is None:
             log.error("failed to get sacct members")
