@@ -101,3 +101,6 @@ dmypy.json
 
 # Editors
 .vscode
+
+# Misc
+.DS_Store
