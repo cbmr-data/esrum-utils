@@ -6,11 +6,9 @@ RUN apt-get update \
     && apt-get autoremove -y --purge build-essential \
     && rm -rf /var/cache/apt/
 
-RUN mkdir -p /cwd /maps /scratch
-RUN ln -s /maps/projects /projects
-RUN ln -s /maps/datasets /datasets
-
-WORKDIR /cwd
+RUN mkdir -p /maps /scratch \
+    && ln -s /maps/projects /projects \
+    && ln -s /maps/datasets /datasets
 
 ADD https://www.chg.ox.ac.uk/~wrayner/tools/ic.v1.0.9.zip /usr/local/share/
 RUN cd /usr/local/share/ \
