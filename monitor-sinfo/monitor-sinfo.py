@@ -258,7 +258,9 @@ class SlackBlock:
 
     def to_json(self) -> JSON:
         if self._type == "text":
-            assert self._text is not None
+            if self._text is None:
+                raise AssertionError("impossible situation: text object without text")
+
             out: JSON = {"type": "text", "text": self._text}
 
             style: JSON = {}
@@ -271,7 +273,9 @@ class SlackBlock:
 
             return out
         elif self._type == "emoji":
-            assert self._text is not None
+            if self._text is None:
+                raise AssertionError("impossible situation: emoji object without text")
+
             return {"type": "emoji", "name": self._text}
         elif self._type == "rich_text_list":
             return {
@@ -303,7 +307,7 @@ class SlackNotifier(Notifier):
         block = SlackBlock("rich_text")
         block.add_element("rich_text_section").add_text(
             "Node status update for {}:\n\n".format(
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # noqa: DTZ005
             )
         )
 
@@ -336,7 +340,11 @@ class SlackNotifier(Notifier):
                     item.add_text(" went from ")
 
                 if change not in (ChangeType.Added, ChangeType.Removed):
-                    assert update.last_state is not None
+                    if update.last_state is None:
+                        raise AssertionError(
+                            "impossible situation: state changed, but has no last state"
+                        )
+
                     item.add_text(Status.format(update.last_state), italic=True)
                     item.add_text(" to ")
                     item.add_text(Status.format(update.state), italic=True)

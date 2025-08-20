@@ -46,7 +46,9 @@ def read_proc_status(proc: Path) -> Process | None:
         username = get_username(uid) or "effective"
 
         peak, unit = status["VmPeak"].split()
-        assert unit == "kB", unit
+        if unit != "kB":
+            raise NotImplementedError(f"unsupported unit {unit}")
+
         peak_mem = float(peak) / 1024 / 1024
     except KeyError:
         return None
@@ -91,9 +93,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    hostname = gethostname()
-    if hostname.endswith(".unicph.domain"):
-        hostname = hostname[:-14]
+    hostname = gethostname().removesuffix(".unicph.domain")
 
     print("Hostname", "User", "PeakVM", "PID", "Process", sep="\t")
     for it in Path("/proc").iterdir():

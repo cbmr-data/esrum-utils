@@ -75,7 +75,7 @@ class User(Base):
     # Max length based on Linux limits (see `man useradd`)
     name: Mapped[str] = mapped_column(String(32))
 
-    # The assosiated group
+    # The associated group
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
     group: Mapped[Group] = relationship(viewonly=True)
 

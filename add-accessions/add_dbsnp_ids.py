@@ -7,7 +7,7 @@ import os
 import re
 import sqlite3
 import sys
-from collections.abc import Iterable, Iterator  # noqa: TC003
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Callable, NoReturn, TypeVar
 
@@ -39,7 +39,7 @@ def abort(*args: object) -> NoReturn:
 
 def progress(values: Iterable[T], *, desc: str | None = None) -> Iterable[T]:
     try:
-        import tqdm  # pyright: ignore[reportMissingModuleSource]
+        import tqdm  # pyright: ignore[reportMissingModuleSource]  # noqa: PLC0415
     except ImportError:
         return values
     else:
@@ -244,14 +244,14 @@ def main_lookup(
                     (chrom, int(position), ref, alt),
                 )
 
-            identifers = ",".join(sorted(set(key for (key,) in query)))
-            if identifers:
+            identifiers = ",".join(sorted({key for (key,) in query}))
+            if identifiers:
                 records_found += 1
             else:
-                identifers = missing_value
+                identifiers = missing_value
                 records_missing += 1
 
-            print(line.rstrip("\r\n"), identifers)
+            print(line.rstrip("\r\n"), identifiers)
 
     records_total = records_found + records_missing
     records_found_pct = int(1000 * records_found / records_total) / 10  # rounded down

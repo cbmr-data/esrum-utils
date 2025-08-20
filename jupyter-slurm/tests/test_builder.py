@@ -4,7 +4,6 @@ import getpass
 from typing import Literal
 
 import pytest
-
 from jupyter_slurm import sbatch_script, slurm_options, srun_command
 
 DEFAULT_EMAIL = f"{getpass.getuser()}@ku.dk"

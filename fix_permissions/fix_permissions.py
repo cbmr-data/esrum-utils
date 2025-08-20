@@ -9,8 +9,9 @@ import pwd
 import shlex
 import stat
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, NoReturn, TypeVar
+from typing import NoReturn, TypeVar
 
 T = TypeVar("T")
 
@@ -18,7 +19,7 @@ T = TypeVar("T")
 def tqdm(seq: Iterable[T]) -> Iterable[T]:
     if sys.stderr.isatty():
         try:
-            import tqdm
+            import tqdm  # noqa: PLC0415
 
             return tqdm.tqdm(seq, unit=" entry", unit_scale=True)
         except ImportError:
@@ -162,7 +163,7 @@ def main(argv: list[str]) -> int:
         elif stats.st_gid != gid:
             if not args.quiet:
                 print(
-                    "lchown {} since ownership is {}/{}".format(
+                    "lchown {} since ownership is {}/{}".format(  # noqa: UP032
                         quote(filepath),
                         get_user_name(stats.st_uid),
                         get_group_name(stats.st_gid),
@@ -187,7 +188,7 @@ def main(argv: list[str]) -> int:
                     # Inherit S_ISGID
                     mode = mode | (stats.st_mode & stat.S_ISGID)
                 else:
-                    # Ensure that group IDs of files are inheritied from dirs
+                    # Ensure that group IDs of files are inherited from dirs
                     mode = mode | stat.S_ISGID
             else:
                 mode |= min_file_premissions

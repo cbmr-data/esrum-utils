@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ignore use of insecure RNG; only used for simulating sinfo states
+# ruff: noqa: S311
 from __future__ import annotations
 
 import argparse
@@ -24,8 +26,6 @@ _GOOD_STATES = (
 _BAD_STATES = ("down", "drain", "drng", "fail", "failg", "pow_dn", "unk")
 _OVERLAP = frozenset(_GOOD_STATES).intersection(_BAD_STATES)
 
-assert not _OVERLAP, _OVERLAP
-
 
 @dataclass
 class Node:
@@ -41,12 +41,12 @@ class Node:
         if not isinstance(data, dict):
             abort(f"invalid node object: {data!r}")
 
-        data = cast(dict[object, object], data)
+        data = cast("dict[object, object]", data)
         for key, value in data.items():
             if not (key and value and isinstance(key, str) and isinstance(value, str)):
                 abort(f"invalid node object: {data!r}")
 
-        data = cast(dict[str, str], data)
+        data = cast("dict[str, str]", data)
         try:
             return Node(name=data["name"], state=data["state"], reason=data["reason"])
         except KeyError:
@@ -105,7 +105,7 @@ def read_sim(filepath: Path) -> list[Node]:
     if not isinstance(data, list):
         abort(f"invalid sim data {data!r}")
 
-    return [Node.from_json(it) for it in cast(list[object], data)]
+    return [Node.from_json(it) for it in cast("list[object]", data)]
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

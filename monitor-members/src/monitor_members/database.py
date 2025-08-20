@@ -97,7 +97,7 @@ class Database:
         self._engine = None
 
     def unreported_updates(self) -> list[GroupChange]:
-        """Returns updates since the last (succesful) report"""
+        """Returns updates since the last (successful) report"""
         if self._session is None:
             raise RuntimeError("database not initialized")
 

@@ -36,6 +36,8 @@ class LDAP:
                 if line := line.strip():
                     return line
 
+        return None
+
     def members(self, name: str) -> set[str] | None:
         if (lines := self._get(name, "member")) is not None:
             members: set[str] = set()
@@ -45,6 +47,8 @@ class LDAP:
                         members.add(field[3:])
 
             return members
+
+        return None
 
     def _get(self, key: str, attr: str) -> list[str] | None:
         self._log.debug("fetching %r for LDAP key %r", attr, key)

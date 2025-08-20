@@ -92,7 +92,7 @@ class Kerberos:
                 break
 
             try:
-                wake_at = datetime.now() + timedelta(seconds=interval)
+                wake_at = datetime.now() + timedelta(seconds=interval)  # noqa: DTZ005
                 self._log.info("Next loop at %s", wake_at)
                 time.sleep(interval)
             except KeyboardInterrupt:

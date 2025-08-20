@@ -8,13 +8,11 @@ import shlex
 import subprocess
 import sys
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, NoReturn
-
-if TYPE_CHECKING:
-    from typing_extensions import Literal
+from typing import Literal, NoReturn
 
 
 @dataclass

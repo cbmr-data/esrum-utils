@@ -31,6 +31,27 @@ ignore = [
     # Complexity warnings disabled for now
     "PLR09", # too-many-*
     "T20",   # flake8-print
+    "TD",    # flake8-todos
     # Disabled to ensure identical behavior between execution/run-time
     "TC002", # typing-only-third-party-import -- Move third-party import `...` into a type-checking block
+    "TC003", # typing-only-standard-library-import -- Move standard library import `...` into a type-checking block
+    # Try to avoid TYPE_CHECKING blocks to unify runtime/typechecking logic
+    "TC001", # typing-only-first-party-import
+    "TC002", # typing-only-third-party-import
+    "TC003", # typing-only-standard-library-import
+]
+
+
+[tool.ruff.lint.per-file-ignores]
+
+"*/noxfile.py" = [
+    "D",      # pydocstyle
+    "INP001", # implicit-namespace-package
+]
+
+"*/tests/**.py" = [
+    "D",    # pydocstyle
+    "S101", # assert -- Use of assert detected
+    "S108", # hardcoded-temp-file -- Probable insecure usage of temporary file or dir
+    "S311", # suspicious-non-cryptographic-random-usage
 ]

@@ -175,10 +175,9 @@ class Result:
 
 
 def count_files(root: Path, expected: set[Path]) -> Result:
-    result = Result(timestamp=datetime.now().isoformat())
-    if expected is not None:
-        result.expected = len(expected)
-        result.found = 0
+    result = Result(timestamp=datetime.now().isoformat())  # noqa: DTZ005
+    result.expected = len(expected)
+    result.found = 0
 
     queue: deque[Path] = deque([root])
     while queue:
@@ -250,7 +249,7 @@ def main(argv: list[str]) -> int:
 
     setup_logging(args)
 
-    expected: set[Path] | None = set()
+    expected: set[Path] = set()
     if args.expected is not None:
         with args.expected.open() as handle:
             for line in handle:

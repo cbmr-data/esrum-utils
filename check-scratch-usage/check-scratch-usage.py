@@ -81,7 +81,7 @@ def main_check(_: argparse.Namespace) -> int:
         "root": "",
     }
 
-    for path, key in (("/", "root"), ("/tmp", "tmp"), ("/scratch", "scratch")):
+    for path, key in (("/", "root"), ("/tmp", "tmp"), ("/scratch", "scratch")):  # noqa: S108
         # Collect utilization in KB (1024)
         results[key] = run(["df", "-kP", path]).splitlines()[-1].split()[2]
 
