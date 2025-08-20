@@ -39,7 +39,10 @@
 5. Install `jupyter_slurm` in the environment
 
     ```shell
-    ./jupyter-slurm/bin/pip install /projects/cbmr_shared/apps/dap/jupyter_slurm
+    # latest version
+    ./jupyter-slurm/bin/pip install /projects/cbmr_shared/apps/dap/jupyter_slurm/latest
+    # or a specific version
+    # ./jupyter-slurm/bin/pip install /projects/cbmr_shared/apps/dap/jupyter_slurm/0.0.1
     ```
 
 To start the notebook, run, replacing `XYZ` with the port number you are using (see the official documentation)
@@ -58,7 +61,10 @@ Instead of installing the module, add it to Python's `sys.path` list as shown be
 
 ```python
 import sys
+# latest version
 sys.path.append("/projects/cbmr_shared/apps/dap/jupyter_slurm/latest/src")
+# or a specific version
+# sys.path.append("/projects/cbmr_shared/apps/dap/jupyter_slurm/0.0.1/src")
 ```
 
 You can now import / use `jupyter_slurm` as described in the `Usage` section below.
