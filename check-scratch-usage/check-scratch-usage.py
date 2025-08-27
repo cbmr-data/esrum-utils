@@ -8,14 +8,13 @@ import json
 import socket
 import subprocess
 import sys
-from typing import TypedDict
 
-
-class Stats(TypedDict):
-    host: str
-    root: str
-    tmp: str
-    scratch: str
+LOCATIONS = {
+    "root": "/",
+    "tmp": "/tmp",  # noqa: S108
+    "var-tmp": "/var/tmp",  # noqa: S108
+    "scratch": "/scratch",
+}
 
 
 def to_gb(size: str) -> str:
@@ -37,7 +36,7 @@ def run(command: list[str]) -> str:
 
 
 def main_list(_: argparse.Namespace) -> int:
-    rows: list[Stats] = [
+    rows: list[dict[str, str]] = [
         # Collect statistics for the current/head node
         json.loads(run([sys.executable, __file__, "check"]).strip()),
     ]
@@ -49,8 +48,7 @@ def main_list(_: argparse.Namespace) -> int:
                 # Run on all partitions
                 f"--partition={partition}",
                 # Run on all (available) nodes
-                "--nodes=1-1024",
-                "--immediate=5",
+                "--spread-job",
                 sys.executable,
                 __file__,
                 "check",
@@ -60,13 +58,11 @@ def main_list(_: argparse.Namespace) -> int:
         for line in stdout.splitlines():
             rows.append(json.loads(line))
 
-    print("host", "root", "tmp", "scratch", sep="\t")
+    print("host", *LOCATIONS, sep="\t")
     for row in sorted(rows, key=lambda it: it["host"]):
         print(
             row["host"],
-            to_gb(row["root"]),
-            to_gb(row["tmp"]),
-            to_gb(row["scratch"]),
+            *(to_gb(row[key]) for key in LOCATIONS),
             sep="\t",
         )
 
@@ -74,14 +70,11 @@ def main_list(_: argparse.Namespace) -> int:
 
 
 def main_check(_: argparse.Namespace) -> int:
-    results: Stats = {
+    results: dict[str, str] = {
         "host": socket.gethostname(),
-        "scratch": "",
-        "tmp": "",
-        "root": "",
     }
 
-    for path, key in (("/", "root"), ("/tmp", "tmp"), ("/scratch", "scratch")):  # noqa: S108
+    for key, path in LOCATIONS.items():
         # Collect utilization in KB (1024)
         results[key] = run(["df", "-kP", path]).splitlines()[-1].split()[2]
 
