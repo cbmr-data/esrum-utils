@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import functools
 import json
 import socket
 import subprocess
 import sys
+from itertools import zip_longest
 
 LOCATIONS = {
     "root": "/",
@@ -17,7 +19,41 @@ LOCATIONS = {
 }
 
 
-def to_gb(size: str) -> str:
+def print_table(table: list[list[str]]) -> None:
+    if sys.stdout.isatty():
+        sep = "  "
+        widths = []
+        for row in table:
+            widths = [
+                max(width, 0 if isinstance(it, int) else len(it))
+                for width, it in zip_longest(widths, row, fillvalue=0)
+            ]
+
+        # The final column should not be padded
+        widths[-1] = 0
+
+        padded_table: list[list[str]] = []
+        for row in table:
+            result: list[str] = []
+            for width, value in zip(widths, row):
+                result.append(value.ljust(width))
+
+            padded_table.append(result)
+
+        table = padded_table
+    else:
+        sep = "\t"
+
+    with contextlib.suppress(KeyboardInterrupt):
+        for row in table:
+            print(*row, sep=sep)
+
+
+def gethostname() -> str:
+    return socket.gethostname().split(".", 1)[0]
+
+
+def to_gb(size: str | int) -> str:
     return f"{int(size) / 1024 / 1024:.1f}"
 
 
@@ -36,10 +72,13 @@ def run(command: list[str]) -> str:
 
 
 def main_list(_: argparse.Namespace) -> int:
-    rows: list[dict[str, str]] = [
-        # Collect statistics for the current/head node
-        json.loads(run([sys.executable, __file__, "check"]).strip()),
-    ]
+    nodes: dict[str, dict[str, str] | None] = {}
+    for node in run(["sinfo", "--noheader", "--format", "%N"]).split(","):
+        if node := node.strip():
+            nodes[node] = None
+
+    # Collect statistics for the current/head node
+    nodes[gethostname()] = json.loads(run([sys.executable, __file__, "check"]).strip())
 
     for partition in ("standardqueue", "gpuqueue"):
         stdout = run(
@@ -56,27 +95,42 @@ def main_list(_: argparse.Namespace) -> int:
         )
 
         for line in stdout.splitlines():
-            rows.append(json.loads(line))
+            row = json.loads(line)
+            if nodes.get(row["host"]):
+                raise AssertionError(f"duplicate node {row}")
 
-    print("host", *LOCATIONS, sep="\t")
-    for row in sorted(rows, key=lambda it: it["host"]):
-        print(
-            row["host"],
-            *(to_gb(row[key]) for key in LOCATIONS),
-            sep="\t",
-        )
+            nodes[row["host"]] = row
+
+    rows = [["host", *LOCATIONS, *(f"{it}-free" for it in LOCATIONS)]]
+    for host, row in sorted(nodes.items()):
+        output: list[str] = [host]
+        remaining: list[str] = []
+
+        if row is None:
+            remaining.extend("NA" for _ in range(len(LOCATIONS) * 2))
+        else:
+            for loc in LOCATIONS:
+                output.append(to_gb(row[loc]))
+                remaining.append(to_gb(row[f"{loc}-free"]))
+
+        output.extend(remaining)
+        rows.append(output)
+
+    print_table(rows)
 
     return 0
 
 
 def main_check(_: argparse.Namespace) -> int:
     results: dict[str, str] = {
-        "host": socket.gethostname(),
+        "host": gethostname(),
     }
 
     for key, path in LOCATIONS.items():
-        # Collect utilization in KB (1024)
-        results[key] = run(["df", "-kP", path]).splitlines()[-1].split()[2]
+        # Collect utilization and capacity in KB (1024)
+        row = run(["df", "-kP", path]).splitlines()[-1].split()
+        results[key] = row[2]
+        results[f"{key}-free"] = row[3]
 
     print(json.dumps(results))
 
