@@ -76,14 +76,21 @@ class LDAP:
             return None
 
         lines: list[str] = []
+        found_dn = False
 
         attr_key_b64 = f"{attr}:: "
         attr_key = f"{attr}: "
         for line in proc.stdout.splitlines():
+            # the distinguished name (dn) attribute is always returned for valid groups
+            found_dn |= line.startswith("dn:")
+
             if line.startswith(attr_key):
                 lines.append(line[len(attr_key) :].strip())
             elif line.startswith(attr_key_b64):
                 value = line[len(attr_key_b64) :].strip()
                 lines.append(base64.b64decode(value).decode("utf-8", errors="replace"))
+
+        if not (lines or found_dn):
+            self._log.warning("no results for %r for LDAP key %r", attr, key)
 
         return lines
