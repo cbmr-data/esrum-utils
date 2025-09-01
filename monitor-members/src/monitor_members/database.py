@@ -148,13 +148,14 @@ class Database:
 
         return changes
 
-    def update_ldap_groups(self) -> bool:
+    def update_ldap_groups(self, max_errors: int = 3) -> bool:
         self._log.info(
             "updating LDAP group memberships for %i groups", len(self._groups)
         )
         if self._session is None:
             raise RuntimeError("database not initialized")
 
+        loop_errors = 0
         for group_name in sorted(self._groups):
             self._log.debug("checking group %r for updates", group_name)
             group_stmt = sqlalchemy.select(Group).where(Group.name == group_name)
@@ -180,7 +181,12 @@ class Database:
             ldap_users = self._ldap.members(group_name)
             if ldap_users is None:
                 self._log.error("failed to get LDAP members for %r", group_name)
-                return False
+
+                loop_errors += 1
+                if loop_errors >= max_errors:
+                    break
+
+                continue
             elif not (ldap_users or current_users):
                 self._log.warning("no members in LDAP group %r", group_name)
 
@@ -200,7 +206,7 @@ class Database:
 
         self._session.commit()
 
-        return True
+        return loop_errors < max_errors and loop_errors < len(self._groups)
 
     def add_report(self, *, kind: ReportKind, success: bool) -> None:
         if self._session is None:
