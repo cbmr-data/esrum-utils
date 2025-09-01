@@ -25,7 +25,7 @@ class Args(tap.TypedArgs):
     interval: float = tap.arg(
         type=parse_duration,
         metavar="N",
-        default=0,
+        default=0.0,
         help="Repeat monitoring steps every N seconds, if value is greater than 0. "
         "Accepts units 'd', 'h', 'm', and 's', for days, hours, minutes and seconds",
     )
