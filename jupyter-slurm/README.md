@@ -14,7 +14,7 @@
 2. Load the python version you wish to use
 
     ```shell
-    module load python/3.12.3
+    module load python/3.12.8
     ```
 
 3. Create a virtual environment for `jupyter` / `jupyter_slurm`
