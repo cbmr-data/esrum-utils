@@ -168,7 +168,7 @@ def sbatch_script(
     array_params: str | None = None,
     wait: bool = False,
     mail_user: str | bool = False,
-    strict: bool = False,
+    strict: bool = True,
 ) -> list[str]:
     """Generate sbatch script for running one or more commands.
 
