@@ -105,4 +105,117 @@ print("  STDOUT =", result.stdout)
 print("  STDERR =", result.stderr)
 ```
 
-### Writing commands for `sbatch` / `srun`
+## Reference
+
+### sbatch
+
+```python
+def sbatch(commands: Sequence[str] | Sequence[Sequence[str]],
+           *,
+           cpus: int = 1,
+           gpus: int = 0,
+           gpu_type: Literal["a100", "h100", "A100", "H100"] | None = None,
+           memory: int | str | None = None,
+           job_name: str | None = None,
+           modules: SequenceNotStr[str] = (),
+           extra_args: SequenceNotStr[str] = (),
+           output_file: str | Path | None = None,
+           array_params: str | None = None,
+           wait: bool = False,
+           mail_user: str | bool = False,
+           strict: bool = True) -> int
+```
+
+Submit an sbatch script for running one or more commands.
+
+**Arguments**:
+
+- `commands` - One or more commands to be run using sbatch. May be a list of strings,
+  in which case the strings are assumed to be properly formatted commands and
+  included as is, or a list of list of strings, in which case the each list of
+  strings is assumed to represent a single command, and each argument is
+  quoted/escaped to ensure that special characters are properly handled.
+- `cpus` - The number of CPUs to reserve. Must be a number in the range 1 to 128.
+  Defaults to 1.
+- `memory` - The amount of memory to reserve. Must be a positive number (in MB) or a
+  string ending with a unit (K, M, G, T). Defaults to ~16G per CPU.
+- `gpus` - The number of CPUs to reserve, either 0, 1, or 2. Jobs that reserve CPUs
+  will be run on the GPU queue. Defaults to 0.
+- `gpu_type` - Preferred GPU type, if any, either 'a100' or 'h100'. Defaults to None.
+- `job_name` - An optional string naming the current Slurm job.
+- `modules` - A list of zero or more environment modules to load before running the
+  commands specified above. Defaults to ().
+- `extra_args` - A list of arguments passed directly to srun/sbatch. Multi-part
+  arguments must therefore be split into multiple values:
+  ["--foo", "bar"] and not ["--foo bar"]
+- `output_file` - Optional name of log-file foom the job.
+- `array_params` - Optional job-array parameters (see "--array").
+- `mail_user` - Send an email to user on failures or completion of the job. May
+  either be an email address, or `True` to send an email to `$USER@ku.dk`.
+- `wait` - If true, wait for the job to complete before returning. Defaults to False.
+- `strict` - If true, the script is configured to terminate on the first error.
+  Defaults to true.
+  
+
+**Returns**:
+
+- `int` - The JobID of the submitted job.
+
+
+### srun
+
+```python
+def srun(
+    command: Sequence[str],
+    *,
+    cpus: int = 1,
+    gpus: int = 0,
+    memory: int | str | None = None,
+    modules: SequenceNotStr[str] = (),
+    extra_args: SequenceNotStr[str] = (),
+    capture: bool = False,
+    text: bool = True,
+    strict: bool = True
+) -> SrunResult[None] | SrunResult[str] | SrunResult[bytes]
+```
+
+Run command via `srun`, and optionally capture its output.
+
+WARNING: This function can only be used from esrumhead01fl!
+
+**Arguments**:
+
+- `command` - The command to run, either as a single string that is assumed to
+  contain a properly formatted shell command, or as a list of strings, that is
+  assumed to present each argument in the command.
+- `cpus` - The number of CPUs to reserve. Must be a number in the range 1 to 128.
+  Defaults to 1.
+- `memory` - The amount of memory to reserve. Must be a positive number (in MB) or a
+  string ending with a unit (K, M, G, T). Defaults to ~16G per CPU.
+- `gpus` - The number of CPUs to reserve, either 0, 1, or 2. Jobs that reserve CPUs
+  will be run on the GPU queue. Defaults to 0.
+- `gpu_type` - Preferred GPU type, if any, either 'a100' or 'h100'. Defaults to None.
+- `extra_args` - A list of arguments passed directly to srun/sbatch. Multi-part
+  arguments must therefore be split into multiple values:
+  ["--foo", "bar"] and not ["--foo bar"]
+- `modules` - A list of zero or more environment modules to load before running the
+  commands specified above. Defaults to ().
+- `capture` - If true, srun's stdout and stderr is captured and returned. Defaults to
+  False.
+- `text` - If true, output captured by `capture` is assumed to be UTF8 and decoded
+  to strings. Otherwise bytes are returned. Defaults to True.
+- `strict` - If true, the script is configured to terminate on the first error.
+  Defaults to true.
+  
+
+**Raises**:
+
+- `SlurmError` - Raised if this command is invoked on a compute node.
+  
+
+**Returns**:
+
+- `int` - The exit-code from running `srun` (non-zero on error)
+  int, str, str: The srun exit-code, stdout, and stderr, if `capture` is True.
+  int, bytes, bytes: As above, but `text` is False.
+
