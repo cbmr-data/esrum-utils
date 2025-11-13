@@ -1,4 +1,4 @@
-#!/opt/software/python/3.11.3/bin/python3
+#!/usr/bin/python3.11
 # pyright: strict
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ _DEFAULT_MEM_PER_CPU = 15948 / 1024
 
 _RE_ELAPSED = re.compile(r"(?:(\d+)-)?(?:(\d{2}):)?(\d{2}):(\d{2}\.?\d*)")
 
-__VERSION__ = (2025, 8, 12, 1)
+__VERSION__ = (2025, 11, 13, 1)
 __VERSION_STR__ = "{}{:02}{:02}.{}".format(*__VERSION__)
 
 
@@ -378,7 +378,9 @@ def update_running_jobs(jobs: list[Usage]) -> bool:
     # 2. sstat does permit access to other users' jobs by default
     user = getpass.getuser()
     running_jobs: dict[str, Usage] = {
-        job.raw_job: job for job in jobs if job.state == "RUNNING" and job.user == user
+        job.raw_job: job
+        for job in jobs
+        if job.state == "RUNNING" and user in ("root", job.user)
     }
 
     if running_jobs:
