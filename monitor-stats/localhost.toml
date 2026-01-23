@@ -1,0 +1,6 @@
+# Example configuration file for `monitor-stats`
+
+# Listen with `nc -kl localhost 12345`
+slack_webhooks = ["http://localhost:12345"]
+
+process_blacklist = ["\\brg\\b.+--follow", "\\brsync\\b"]
