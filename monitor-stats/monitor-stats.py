@@ -146,7 +146,8 @@ class Monitor:
                         updated_whitelist[pid] = stat.st_ctime
                         continue
 
-                    _debug("checking process %i with command %r", pid, cmdline)
+                    user = get_username(stat.st_uid)
+                    _debug("checking PID %i (%s) with command %r", pid, user, cmdline)
                     if cmdline:
                         for flt in self._process_filters:
                             if flt.search(cmdline):
@@ -157,7 +158,7 @@ class Monitor:
                                         "Found blacklisted process %i (%s) running for "
                                         "%.1f seconds: %r",
                                         pid,
-                                        get_username(stat.st_uid),
+                                        user,
                                         runtime,
                                         cmdline,
                                     )
