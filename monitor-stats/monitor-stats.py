@@ -87,6 +87,7 @@ class Monitor:
     def __init__(
         self,
         process_filters: Iterable[str],
+        loadavg_measure: Literal[1, 5, 15],
         min_process_uid: int,
         max_process_age: float,
     ) -> None:
@@ -97,6 +98,7 @@ class Monitor:
             re.compile(it) for it in process_filters
         )
         self._pid_whitelist: dict[int, float] = {}
+        self._loadavg_measure = loadavg_measure
         self._min_process_uid = min_process_uid
         self._max_process_age = max_process_age
 
@@ -108,7 +110,7 @@ class Monitor:
         self._last_time = current_time
         metrics: dict[Metrics, float] = {
             "%CPU": self._get_cpu_load(since_last),
-            "LoadAvg": self._get_loadavg(since_last),
+            "LoadAvg": self._get_loadavg(),
             "Memory": self._get_mem_usage(),
         }
 
@@ -171,17 +173,18 @@ class Monitor:
 
         return processes
 
-    @classmethod
-    def _get_loadavg(cls, since_last: float) -> float:
+    def _get_loadavg(self) -> float:
         with PATH_LOAD_AVERAGE.open("rb") as handle:
             loadavg = handle.readline().split(None)
 
-        if since_last <= 90:
+        if self._loadavg_measure == 1:
             return float(loadavg[0])  # avg. last minute
-        elif since_last <= 7.5 * 60:
+        elif self._loadavg_measure == 5:
             return float(loadavg[1])  # avg. last five minutes
-        else:
+        elif self._loadavg_measure == 15:
             return float(loadavg[2])  # avg. last fifteen minutes
+        else:
+            raise NotImplementedError(self._get_loadavg)
 
     def _get_cpu_load(self, since_last: float) -> float:
         cpus = 0
@@ -234,7 +237,7 @@ class SlackNotifier:
         if stats:
             alerts.extend(
                 self._add_entry(
-                    f"Resource usage at {self._host} exceeds tresholds",
+                    f"Resource usage at {self._host} exceeds thresholds",
                     [self._add_metrics(key, value) for key, value in stats.items()],
                 )
             )
@@ -370,6 +373,7 @@ class Args:
     loop: float
     slack_timeout: float
 
+    loadavg_measure: Literal[1, 5, 15]
     loadavg_step: float
     cpu_step: float
     memory_step: float
@@ -420,6 +424,15 @@ def parse_args(argv: list[str]) -> Args:
     )
 
     group = parser.add_argument_group("Measurements")
+    group.add_argument(
+        "--loadavg-measure",
+        metavar="MIN",
+        type=int,
+        default=5,
+        choices=(1, 5, 15),
+        help="Use loadavg for the last MIN minutes",
+    )
+
     group.add_argument(
         "--loadavg-step",
         metavar="X",
@@ -483,6 +496,7 @@ def main(argv: list[str]) -> int:
 
     monitor = Monitor(
         process_filters=config.process_blacklist,
+        loadavg_measure=args.loadavg_measure,
         min_process_uid=args.min_process_uid,
         max_process_age=args.max_process_runtime,
     )
