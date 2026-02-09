@@ -3,4 +3,11 @@
 # Listen with `nc -kl localhost 12345`
 slack_webhooks = ["http://localhost:12345"]
 
-process_blacklist = ["\\brg\\b.+--follow", "\\brsync\\b"]
+process_blacklist = [
+    "\\brg\\b.+--follow",
+    "\\brsync\\b",
+    "\\bcp\\b",
+    "\\bmv\\b",
+]
+
+process_whitelist = ["^srun"]

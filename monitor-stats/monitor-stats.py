@@ -86,7 +86,8 @@ def format_time(seconds: float) -> str:
 class Monitor:
     def __init__(
         self,
-        process_filters: Iterable[str],
+        process_whitelist: Iterable[str],
+        process_blacklist: Iterable[str],
         loadavg_measure: Literal[1, 5, 15],
         min_process_uid: int,
         max_process_age: float,
@@ -94,9 +95,13 @@ class Monitor:
         self._last_time: float = time.time()
         self._last_cpu_stat: float = 0.0
 
-        self._process_filters: tuple[re.Pattern[str], ...] = tuple(
-            re.compile(it) for it in process_filters
+        self._process_whitelist: tuple[re.Pattern[str], ...] = tuple(
+            re.compile(it) for it in process_whitelist
         )
+        self._process_blacklist: tuple[re.Pattern[str], ...] = tuple(
+            re.compile(it) for it in process_blacklist
+        )
+
         self._pid_whitelist: dict[int, float] = {}
         self._loadavg_measure = loadavg_measure
         self._min_process_uid = min_process_uid
@@ -119,7 +124,7 @@ class Monitor:
     def get_processes(self) -> dict[int, tuple[int, str, float]]:
         processes: dict[int, tuple[int, str, float]] = {}
 
-        if self._process_filters:
+        if self._process_blacklist:
             updated_whitelist: dict[int, float] = {}
             for it in PATH_PROC.iterdir():
                 if it.name.isdigit():
@@ -133,6 +138,10 @@ class Monitor:
                             updated_whitelist[pid] = stat.st_ctime
                             continue
                     except FileNotFoundError:
+                        continue
+
+                    runtime = time.time() - stat.st_ctime
+                    if runtime < self._max_process_age:
                         continue
 
                     try:
@@ -149,26 +158,18 @@ class Monitor:
                     user = get_username(stat.st_uid)
                     _debug("checking PID %i (%s) with command %r", pid, user, cmdline)
                     if cmdline:
-                        for flt in self._process_filters:
-                            if flt.search(cmdline):
-                                runtime = time.time() - stat.st_ctime
-                                _debug("process %i is blacklisted", pid)
-                                if runtime > self._max_process_age:
-                                    _info(
-                                        "Found blacklisted process %i (%s) running for "
-                                        "%.1f seconds: %r",
-                                        pid,
-                                        user,
-                                        runtime,
-                                        cmdline,
-                                    )
-                                    processes[pid] = (stat.st_uid, cmdline, runtime)
-                                    updated_whitelist[pid] = stat.st_ctime
-                                break
-                        else:
-                            updated_whitelist[pid] = stat.st_ctime
-                    else:
-                        updated_whitelist[pid] = stat.st_ctime
+
+                        def is_on_list(lst: Iterable[re.Pattern], cmdline: str) -> bool:
+                            return any(flt.search(cmdline) for flt in lst)
+
+                        if is_on_list(self._process_whitelist, "whitelist"):
+                            # do nothing; processed ignored subsequently
+                            _info("whitelisted PID %i (%s): %s", pid, user, cmdline)
+                        elif is_on_list(self._process_blacklist, "blacklist"):
+                            processes[pid] = (stat.st_uid, cmdline, runtime)
+                            _warning("blacklisted PID %i (%s): %s", pid, user, cmdline)
+
+                    updated_whitelist[pid] = stat.st_ctime
 
             self._pid_whitelist = updated_whitelist
 
@@ -345,6 +346,7 @@ class SlackNotifier:
 class Config:
     slack_webhooks: list[str]
     process_blacklist: list[str] = field(default_factory=list[str])
+    process_whitelist: list[str] = field(default_factory=list[str])
 
     @staticmethod
     def load(filepath: Path) -> Config:
@@ -496,7 +498,8 @@ def main(argv: list[str]) -> int:
     )
 
     monitor = Monitor(
-        process_filters=config.process_blacklist,
+        process_whitelist=config.process_whitelist,
+        process_blacklist=config.process_blacklist,
         loadavg_measure=args.loadavg_measure,
         min_process_uid=args.min_process_uid,
         max_process_age=args.max_process_runtime,
