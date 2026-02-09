@@ -24,7 +24,6 @@ _GOOD_STATES = (
     "resv",
 )
 _BAD_STATES = ("down", "drain", "drng", "fail", "failg", "pow_dn", "unk")
-_OVERLAP = frozenset(_GOOD_STATES).intersection(_BAD_STATES)
 
 
 @dataclass
@@ -65,7 +64,14 @@ def abort(msg: str, *args: object) -> NoReturn:
 def random_state(state: str) -> str:
     value = random.random()
 
-    if value < 0.8:
+    if state.endswith("*"):
+        if random.random() < 0.25:
+            state = state.removesuffix("*")
+        return state
+    elif value < 0.8:
+        if random.random() < 0.1:
+            state = f"{state}*"
+
         return state
     elif random.random() < 0.96:
         return random.choice(_GOOD_STATES)
@@ -84,7 +90,7 @@ def initialize(filepath: Path, nnodes: int) -> int:
     samples: list[Node] = []
     for nth in range(1, nnodes + 1):
         state = random_state("idle")
-        reason = "none" if state == "idle" else random_reason()
+        reason = "none" if state.startswith("idle") else random_reason()
 
         samples.append(Node(name=f"esrumcmpn{nth}fl", state=state, reason=reason))
 
@@ -160,7 +166,7 @@ def main(argv: list[str]) -> int:
         new_state = random_state(node.state)
         if new_state != node.state:
             node.state = new_state
-            node.reason = "none" if node.state == "idle" else random_reason()
+            node.reason = "none" if node.state.startswith("idle") else random_reason()
 
         print(node.name, node.state, node.reason, sep="|")
 

@@ -55,24 +55,33 @@ class ChangeType(enum.Enum):
 class Status:
     state: str
     reason: str | None
+    is_responding: bool
+
+    def __init__(self, *, state: str, reason: str | None) -> None:
+        self.state = state.removesuffix("*")
+        self.reason = (reason.strip() if reason else None) or None
+        self.is_responding = not state.endswith("*")
 
     @property
     def is_bad_state(self) -> bool:
-        return self.state in _BAD_STATES or self.state.endswith("*")
+        return self.state in _BAD_STATES
 
-    @staticmethod
-    def format(state: str) -> str:
-        if state.endswith("*"):
-            state = state.rstrip("*")
-            return f"{state} (not responding)"
+    @property
+    def is_available(self) -> bool:
+        return self.is_bad_state or not self.is_responding
 
-        return state
+    def __str__(self) -> str:
+        if not self.is_responding:
+            return f"{self.state} (not responding)"
+
+        return self.state
 
 
 @dataclass
-class StatusChange(Status):
+class StatusChange:
     change: ChangeType
-    last_state: str | None
+    new: Status
+    old: Status | None
 
 
 @dataclass
@@ -109,9 +118,9 @@ class Notifier:
 
     def format_update(self, name: str, update: StatusChange) -> str:
         name = self._highlight(name)
-        state = self._highlight(update.state)
-        last_state = f", was {update.last_state}" if update.last_state else ""
-        reason = f", reason is {update.reason!r}" if update.reason else ""
+        state = self._highlight(str(update.new))
+        last_state = f", was {update.old}" if update.old else ""
+        reason = f", reason is {update.new.reason!r}" if update.new.reason else ""
 
         if update.change == ChangeType.Added:
             return f"Added node {name} with state {state}{reason}"
@@ -141,7 +150,11 @@ class LogNotifier(Notifier):
         for key, update in sorted(updates.items()):
             message = self.format_update(key, update)
 
-            if update.is_bad_state or update.change == ChangeType.Removed:
+            if (
+                update.new.is_bad_state
+                or not update.new.is_available
+                or update.change == ChangeType.Removed
+            ):
                 _warning("%s", message)
             else:
                 _info("%s", message)
@@ -340,18 +353,18 @@ class SlackNotifier(Notifier):
                     item.add_text(" went from ")
 
                 if change not in (ChangeType.Added, ChangeType.Removed):
-                    if update.last_state is None:
+                    if update.old is None:
                         raise AssertionError(
                             "impossible situation: state changed, but has no last state"
                         )
 
-                    item.add_text(Status.format(update.last_state), italic=True)
+                    item.add_text(str(update.old), italic=True)
                     item.add_text(" to ")
-                    item.add_text(Status.format(update.state), italic=True)
+                    item.add_text(str(update.new), italic=True)
 
-                if update.reason:
+                if update.new.reason:
                     item.add_text(" with reason ")
-                    item.add_text(update.reason, italic=True)
+                    item.add_text(update.new.reason, italic=True)
 
         unavailable_nodes = 0
         for status in nodes.values():
@@ -483,14 +496,15 @@ def diff_node_states(
 ) -> dict[str, StatusChange]:
     updates: dict[str, StatusChange] = {}
     for key, node in sorted(curr_states.items()):
-        if key not in prev_states:
+        prev = prev_states.get(key)
+        if prev is None:
             updates[key] = StatusChange(
-                state=node.state,
-                last_state=None,
-                reason=node.reason,
                 change=ChangeType.Added,
+                new=node,
+                old=None,
             )
-        elif prev_states[key].state != node.state:
+            continue
+        elif prev != node:
             if node.is_bad_state:
                 change = ChangeType.Unavailable
             elif prev_states[key].is_bad_state:
@@ -500,17 +514,15 @@ def diff_node_states(
 
             updates[key] = StatusChange(
                 change=change,
-                state=node.state,
-                last_state=prev_states[key].state,
-                reason=node.reason,
+                new=node,
+                old=prev_states[key],
             )
 
     for key in set(prev_states) - set(curr_states):
         updates[key] = StatusChange(
             change=ChangeType.Removed,
-            state="unk",
-            last_state=None,
-            reason=None,
+            new=Status(state="unk", reason=None),
+            old=None,
         )
 
     return updates
