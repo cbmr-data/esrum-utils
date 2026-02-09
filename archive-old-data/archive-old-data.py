@@ -24,7 +24,8 @@ FileStates: TypeAlias = Literal[
     "hardlinks",
     "not_found",
     "target_exists",
-    "uncompressible",
+    "incompressible",
+    "permissions",
 ]
 
 
@@ -91,7 +92,8 @@ def read_file_states(filepath: Path) -> set[Path]:
                     "hardlinks",
                     "not_found",
                     "target_exists",
-                    "uncompressible",
+                    "incompressible",
+                    "permissions",
                 ):
                     abort(f"Invalid state {state!r} on line {linenum}: {line!r}")
 
@@ -167,6 +169,12 @@ def process_file(
     elif stats.st_nlink > 1:
         warning("skipping file with > 1 hardlinks:", quote_path(source))
         return ("hardlinks", stats.st_size, stats.st_size)
+    elif not os.access(source, os.W_OK, follow_symlinks=False):
+        warning("cannot write to file; skipping:", quote_path(source))
+        return ("permissions", stats.st_size, stats.st_size)
+    elif not os.access(source.parent, os.W_OK, follow_symlinks=False):
+        warning("cannot write to folder; skipping:", quote_path(source))
+        return ("permissions", stats.st_size, stats.st_size)
 
     # 2. Verify that the file has not been (partially) processed before
     target = source.parent / f"{source.name}.gz"
@@ -202,16 +210,23 @@ def process_file(
         temp_gz.unlink()
         target_txt.unlink()
         eprint(f"    -> skipped; only compressed to {ratio * 100:.1f}%")
-        return ("uncompressible", stats.st_size, stats_gz.st_size)
+        return ("incompressible", stats.st_size, stats_gz.st_size)
 
     # 6. Ensure that processed files are in place before unlinking source
     if os.path.lexists(target):
-        error("target race condition; skipping: ", quote_path(target))
+        error("target race condition; skipping:", quote_path(target))
         return ("target_exists", stats.st_size, stats.st_size)
 
     eprint(f"    -> compressed to {ratio * 100:.1f}%")
     temp_gz.rename(target)
-    source.unlink()
+
+    try:
+        source.unlink()
+    except PermissionError:
+        error("could not remove old file; reverting:", quote_path(target))
+        target_txt.unlink()
+        target.unlink()
+        return ("permissions", stats.st_size, stats.st_size)
 
     return ("compressed", stats.st_size, stats_gz.st_size)
 
