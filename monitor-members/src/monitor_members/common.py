@@ -105,7 +105,7 @@ class CommandOutput:
 
 def run_subprocess(
     log: logging.Logger,
-    command: list[str] | list[str | Path],
+    command: Sequence[str] | Sequence[str | Path],
 ) -> CommandOutput:
     log.debug("Running command %s", command)
     if not command:

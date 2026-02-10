@@ -35,7 +35,7 @@ def validate_commands(
     return True
 
 
-def update_command(command: list[str], fields: dict[str, str]) -> list[str]:
+def update_command(command: list[str], fields: dict[str, str]) -> tuple[str, ...]:
     res: list[str] = []
     for arg in command:
         for key, value in fields.items():
@@ -43,7 +43,7 @@ def update_command(command: list[str], fields: dict[str, str]) -> list[str]:
 
         res.append(arg)
 
-    return res
+    return tuple(res)
 
 
 class Args(tap.TypedArgs):
@@ -135,6 +135,7 @@ def main(args: Args) -> int:
     )
 
     manager = Sacctmgr(cluster=sacct.cluster, account=sacct.account)
+    failed_commands: set[tuple[str, ...]] = set()
 
     for _ in kerb.authenticated_loop(
         interval=args.interval,
@@ -160,6 +161,9 @@ def main(args: Args) -> int:
             for user in sorted(users):
                 if cmd_template:
                     command = update_command(cmd_template, {**fields, "{user}": user})
+                    if command in failed_commands:
+                        continue
+
                     log.info("%sing %s with command %s", desc, user, quote(*command))
                     if proc := run_subprocess(log, command):
                         if stdout := proc.stdout.rstrip():
@@ -168,7 +172,12 @@ def main(args: Args) -> int:
                     else:
                         log.error("Failed to run command:")
                         proc.log_stderr(log)
-                        return 1
+
+                        failed_commands.add(command)
+                        notifier.send_error_message(
+                            what=f"Error while {desc}ing sacct {user}",
+                            stderr=proc.stderr,
+                        )
                 else:
                     log.info("%sed user %r", desc, user)
 
