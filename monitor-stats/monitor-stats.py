@@ -4,6 +4,7 @@
 # dependencies = [
 #     "coloredlogs==15.0.1",
 #     "koda-validate==4.1.1",
+#     "psutil==7.2.1",
 #     "requests~=2.32.3",
 #     "tomli==2.0.1",
 #     "typing-extensions==4.11.0",
@@ -13,20 +14,23 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import functools
 import json
 import logging
 import pwd
 import re
+import shlex
 import socket
 import sys
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path, PosixPath
-from typing import Literal, NoReturn, TypeAlias, Union
+from typing import Callable, Literal, NoReturn, TypeAlias, Union
 
 import coloredlogs
+import psutil
 import requests
 import tomli
 from koda_validate import DataclassValidator, Valid
@@ -83,6 +87,47 @@ def format_time(seconds: float) -> str:
     return ":".join(fields)
 
 
+@dataclass(frozen=True)
+class IntensiveProcess:
+    pid: int
+    uid: int
+    cpu: float
+    mem: float
+    proc: psutil.Process
+
+    @property
+    def cmd(self) -> str:
+        try:
+            return " ".join(map(shlex.quote, self.proc.cmdline()))
+        except (FileNotFoundError, PermissionError):
+            return "<error getting commandline>"
+
+
+@dataclass
+class BlacklistedProcess:
+    pid: int
+    uid: int
+    cmd: str
+    runtime: float
+
+
+@dataclass
+class Summary:
+    system: dict[Metrics, float]
+    blacklisted: list[BlacklistedProcess]
+    top_processes_by_cpu: list[IntensiveProcess]
+    top_processes_by_mem: list[IntensiveProcess]
+
+    def top_processes(self) -> set[IntensiveProcess]:
+        procs: set[IntensiveProcess] = set()
+        if "Memory" in self.system:
+            procs.update(self.top_processes_by_mem)
+        elif "%CPU" in self.system or "LoadAvg" in self.system:
+            procs.update(self.top_processes_by_cpu)
+
+        return procs
+
+
 class Monitor:
     def __init__(
         self,
@@ -106,23 +151,72 @@ class Monitor:
         self._loadavg_measure = loadavg_measure
         self._min_process_uid = min_process_uid
         self._max_process_age = max_process_age
+        self.processes_mem: list[IntensiveProcess] = []
+        self.processes_cpu: list[IntensiveProcess] = []
 
         self.get()
 
-    def get(self) -> dict[Metrics, float]:
+    def get(self) -> Summary:
+        processes = self._get_processes()
+
         current_time = time.time()
         since_last = current_time - self._last_time
         self._last_time = current_time
-        metrics: dict[Metrics, float] = {
+
+        return Summary(
+            system=self._get_metrics(since_last),
+            blacklisted=self._get_blacklisted_processes(),
+            top_processes_by_cpu=self._filter_processes(
+                processes,
+                key=lambda it: it.cpu,
+                min_value=0.5,
+            ),
+            top_processes_by_mem=self._filter_processes(
+                processes,
+                key=lambda it: it.mem,
+                min_value=0.5,
+            ),
+        )
+
+    @staticmethod
+    def _get_processes() -> list[IntensiveProcess]:
+        processes: list[IntensiveProcess] = []
+        for proc in psutil.process_iter():
+            # Ignore processes that terminated before we can inspect them
+            with contextlib.suppress(psutil.NoSuchProcess):
+                processes.append(
+                    IntensiveProcess(
+                        pid=proc.pid,
+                        uid=proc.uids().effective,
+                        cpu=proc.cpu_percent(interval=None) / 100,
+                        mem=proc.memory_percent(),
+                        proc=proc,
+                    )
+                )
+
+        return processes
+
+    @staticmethod
+    def _filter_processes(
+        processes: Iterable[IntensiveProcess],
+        key: Callable[[IntensiveProcess], float],
+        min_value: float,
+        n: int = 3,
+    ) -> list[IntensiveProcess]:
+        processes = [it for it in processes if key(it) > min_value]
+        processes.sort(key=key, reverse=True)
+
+        return processes[:n]
+
+    def _get_metrics(self, since_last: float) -> dict[Metrics, float]:
+        return {
             "%CPU": self._get_cpu_load(since_last),
             "LoadAvg": self._get_loadavg(),
             "Memory": self._get_mem_usage(),
         }
 
-        return metrics
-
-    def get_processes(self) -> dict[int, tuple[int, str, float]]:
-        processes: dict[int, tuple[int, str, float]] = {}
+    def _get_blacklisted_processes(self) -> list[BlacklistedProcess]:
+        processes: list[BlacklistedProcess] = []
 
         if self._process_blacklist:
             updated_whitelist: dict[int, float] = {}
@@ -159,15 +253,25 @@ class Monitor:
                     _debug("checking PID %i (%s) with command %r", pid, user, cmdline)
                     if cmdline:
 
-                        def is_on_list(lst: Iterable[re.Pattern], cmdline: str) -> bool:
+                        def is_on_list(
+                            lst: Iterable[re.Pattern[str]],
+                            cmdline: str,
+                        ) -> bool:
                             return any(flt.search(cmdline) for flt in lst)
 
                         if is_on_list(self._process_whitelist, "whitelist"):
                             # do nothing; processed ignored subsequently
                             _info("whitelisted PID %i (%s): %s", pid, user, cmdline)
                         elif is_on_list(self._process_blacklist, "blacklist"):
-                            processes[pid] = (stat.st_uid, cmdline, runtime)
                             _warning("blacklisted PID %i (%s): %s", pid, user, cmdline)
+                            processes.append(
+                                BlacklistedProcess(
+                                    pid=pid,
+                                    uid=stat.st_uid,
+                                    cmd=cmdline,
+                                    runtime=runtime,
+                                )
+                            )
 
                     updated_whitelist[pid] = stat.st_ctime
 
@@ -222,35 +326,55 @@ class SlackNotifier:
         self._timeout = timeout
         self._host = host
 
-    def notify(
-        self,
-        *,
-        stats: dict[Metrics, float],
-        processes: dict[int, tuple[int, str, float]],
-    ) -> bool:
+    def notify(self, summary: Summary) -> bool:
         if not self._webhooks:
             self._log.warning("Slack LDAP update not sent; no webhooks configured")
             return False
-        elif not (stats or processes):
+        elif not (summary.system or summary.blacklisted):
             return False
 
         alerts: JSON = []
 
-        if stats:
+        if summary.system:
             alerts.extend(
                 self._add_entry(
                     f"Resource usage at {self._host} exceeds thresholds",
-                    [self._add_metrics(key, value) for key, value in stats.items()],
+                    [
+                        self._add_metrics(key, value)
+                        for key, value in summary.system.items()
+                    ],
                 )
             )
 
-        if processes:
+            if procs := summary.top_processes():
+                alerts.extend(
+                    self._add_entry(
+                        "Top most resource intensive processes are",
+                        [
+                            self._add_process(
+                                uid=it.uid,
+                                pid=it.pid,
+                                cmdline=it.cmd,
+                                cpu_mem=(it.cpu, it.mem),
+                            )
+                            for it in sorted(procs, key=lambda it: -max(it.cpu, it.mem))
+                        ],
+                        warning=False,
+                    )
+                )
+
+        if summary.blacklisted:
             alerts.extend(
                 self._add_entry(
                     f"Blacklisted process is running on {self._host}",
                     [
-                        self._add_process(uid, pid, cmdline, runtime)
-                        for pid, (uid, cmdline, runtime) in processes.items()
+                        self._add_process(
+                            uid=it.uid,
+                            pid=it.pid,
+                            cmdline=it.cmd,
+                            runtime=it.runtime,
+                        )
+                        for it in summary.blacklisted
                     ],
                 )
             )
@@ -265,14 +389,17 @@ class SlackNotifier:
         return self._send_message(blocks)
 
     @classmethod
-    def _add_entry(cls, message: str, elements: JSON) -> Iterable[JSON]:
-        yield {
-            "type": "rich_text_section",
-            "elements": [
-                {"type": "text", "text": f"{message} "},
-                {"type": "emoji", "name": "warning"},
-            ],
-        }
+    def _add_entry(
+        cls,
+        message: str,
+        elements: JSON,
+        *,
+        warning: bool = True,
+    ) -> Iterable[JSON]:
+        text: JSON = [{"type": "emoji", "name": "warning"}] if warning else []
+        text.append({"type": "text", "text": f"{message} "})
+
+        yield {"type": "rich_text_section", "elements": text}
 
         yield {
             "type": "rich_text_list",
@@ -291,24 +418,49 @@ class SlackNotifier:
         }
 
     @classmethod
-    def _add_process(cls, uid: int, pid: int, cmdline: str, runtime: float) -> JSON:
+    def _add_process(
+        cls,
+        *,
+        uid: int,
+        pid: int,
+        cmdline: str,
+        runtime: float | None = None,
+        cpu_mem: tuple[float, float] | None = None,
+    ) -> JSON:
         username = get_username(uid)
+
+        elements: JSON = [
+            {"type": "text", "text": f"Process {pid} ("},
+            {"type": "text", "style": {"italic": True}, "text": username},
+            {"type": "text", "text": ")"},
+        ]
+
+        if runtime is not None:
+            elements.append(
+                {
+                    "type": "text",
+                    "text": " running for {format_time(runtime)}",
+                },
+            )
+
+        if cpu_mem is not None:
+            cpu, mem = cpu_mem
+            elements.append(
+                {
+                    "type": "text",
+                    "text": f" using {cpu:.1f} CPUs and {mem:.1f}% memory",
+                },
+            )
+
+        if len(cmdline) > 200:
+            cmdline = cmdline[:195] + "[...]"
+
+        elements.append({"type": "text", "text": ": "})
+        elements.append({"type": "text", "style": {"code": True}, "text": cmdline})
 
         return {
             "type": "rich_text_section",
-            "elements": [
-                {"type": "text", "text": f"Process {pid} ("},
-                {"type": "text", "style": {"italic": True}, "text": username},
-                {
-                    "type": "text",
-                    "text": f") has been running for {format_time(runtime)}: ",
-                },
-                {
-                    "type": "text",
-                    "style": {"code": True},
-                    "text": cmdline,
-                },
-            ],
+            "elements": elements,
         }
 
     def _send_message(self, blocks: list[JSON]) -> bool:
@@ -515,7 +667,8 @@ def main(argv: list[str]) -> int:
         time.sleep(args.loop)
 
         stats: dict[Metrics, float] = {}
-        for key, value in monitor.get().items():
+        summary = monitor.get()
+        for key, value in summary.system.items():
             step = steps[key]
             threshold = thresholds[key]
 
@@ -534,10 +687,12 @@ def main(argv: list[str]) -> int:
                 _debug("%s lowering threshold from %.2f to %.2f", key, threshold, value)
                 thresholds[key] = value
 
-        processes = monitor.get_processes()
+        summary.system = stats
+        if procs := summary.top_processes():
+            for proc in sorted(procs, key=lambda it: -max(it.mem, it.cpu)):
+                _info("  proc %i (%s): %s", proc.pid, get_username(proc.uid), proc.cmd)
 
-        if stats or processes:
-            notifier.notify(stats=stats, processes=processes)
+        notifier.notify(summary)
 
     return 0
 
