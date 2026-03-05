@@ -283,6 +283,7 @@ def run_sacct(
     user: str | None,
     truncate: bool,
     group: str | None,
+    partition: str | None,
     jobs: str | None,
     state: str | None,
 ) -> str | None:
@@ -309,6 +310,8 @@ def run_sacct(
         command.append("--truncate")
     if group is not None:
         command.append(f"--group={group}")
+    if partition is not None:
+        command.append(f"--partition={partition}")
     if jobs is not None:
         command.append(f"--jobs={jobs}")
     if state is not None:
@@ -617,6 +620,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         dest="group",
         help="Show jobs belonging to group(s); see `man sacct`",
     )
+    parser.add_argument(
+        "-r",
+        "--partition",
+        metavar="PARTITION",
+        dest="partition",
+        help="Show jobs on partition; see `man sacct`",
+    )
 
     parser.add_argument(
         "-j",
@@ -672,6 +682,7 @@ def main(argv: list[str]) -> int:
         user=args.user,
         truncate=args.truncate,
         group=args.group,
+        partition=args.partition,
         jobs=args.jobs,
         state=args.state,
     )
