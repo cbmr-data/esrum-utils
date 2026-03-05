@@ -434,24 +434,24 @@ def update_running_jobs(jobs: list[Usage]) -> bool:
 
 
 def aggregate_statistics(jobs: list[Usage]) -> list[Usage]:
-    by_user: dict[str, Usage] = {}
+    aggregated: dict[tuple[bool, str], Usage] = {}
     for it in jobs:
-        if it.has_measurements:
-            merged = by_user.get(it.user)
-            if merged is None:
-                user = Usage(
-                    job=it.user,
-                    raw_job=it.user,
-                    user=it.user,
-                    name="*",
-                    state="*",
-                )
-                user.jobs.append(it)
-                by_user[it.user] = user
-            else:
-                merged.jobs.append(it)
+        key = (it.has_measurements, it.user)
+        merged = aggregated.get(key)
+        if merged is None:
+            user = Usage(
+                job=it.user,
+                raw_job=it.user,
+                user=it.user,
+                name="*",
+                state="*",
+            )
+            user.jobs.append(it)
+            aggregated[key] = user
+        else:
+            merged.jobs.append(it)
 
-    return list(by_user.values())
+    return list(aggregated.values())
 
 
 def sort_table(
