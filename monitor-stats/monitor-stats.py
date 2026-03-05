@@ -677,14 +677,15 @@ def main(argv: list[str]) -> int:
                 thresholds[key] = value
 
                 _info(
-                    "%s exceeded threshold: %.2f > %.2f; next warning at %.2f",
+                    "Exceeded %s threshold: %.2f > %.2f; next warning at %.2f",
                     key,
                     value,
                     threshold,
                     thresholds[key] + step,
                 )
+
             elif value + step < threshold:
-                _debug("%s lowering threshold from %.2f to %.2f", key, threshold, value)
+                _info("Lowering %s threshold from %.2f to %.2f", key, threshold, value)
                 thresholds[key] = value
 
         summary.system = stats
