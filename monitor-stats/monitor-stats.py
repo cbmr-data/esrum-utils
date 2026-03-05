@@ -592,21 +592,21 @@ def parse_args(argv: list[str]) -> Args:
         "--loadavg-step",
         metavar="X",
         type=float,
-        default=10.0,
+        default=15.0,
         help="Issue alerts every X increase in load average",
     )
     group.add_argument(
         "--cpu-step",
         metavar="X",
         type=float,
-        default=10.0,
+        default=15.0,
         help="Issue alerts every X percent increase in load average",
     )
     group.add_argument(
         "--memory-step",
         metavar="X",
         type=float,
-        default=10.0,
+        default=15.0,
         help="Issue alerts every X percent increase in memory usage",
     )
 
