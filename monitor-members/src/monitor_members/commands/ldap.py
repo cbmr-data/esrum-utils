@@ -31,6 +31,14 @@ class Args(tap.TypedArgs):
     )
 
     ####################################################################################
+    # Notifications
+
+    slack: str = tap.arg(
+        default="default",
+        help="Name of Slack webhook URL to use",
+    )
+
+    ####################################################################################
     # Executables
 
     kinit_exe: str = tap.arg(
@@ -83,8 +91,12 @@ def main(args: Args) -> int:
         ldapsearch_exe=args.ldapsearch_exe,
     )
 
+    if args.slack not in conf.slack.urls:
+        log.critical("Slack webhook %r not found in config file", args.slack)
+        return 1
+
     notifier = SlackNotifier(
-        webhooks=conf.slack.urls,
+        webhooks=[conf.slack.urls[args.slack]],
         timeout=60,
         verbose=True,
     )
