@@ -4,11 +4,32 @@ import subprocess
 import sys
 from pathlib import Path
 
-TEST_ROOT = Path(__file__).parent
-DATABASE = TEST_ROOT / "unique.keys.sqlite3"
+import pytest
+
+########################################################################################
+
+TEST_DATA = """
+1:10019:TA:T rs775809821
+1:10039:A:C rs978760828
+1:10043:T:A rs1008829651
+1:10051:A:G rs1052373574
+1:10055:T:A rs892501864
+1:10055:T:TA rs768019142
+1:10063:A:C rs1010989343
+1:10077:C:G rs1022805358
+1:10108:C:T rs62651026
+1:10109:A:T rs376007522
+"""
 
 
-def execute(*, args: list[str], stdin: str | None) -> str:
+@pytest.fixture
+def database(tmp_path: Path) -> Path:
+    database_path = tmp_path / "index.sqlite3"
+    execute(database_path, args=["--action", "index"], stdin=TEST_DATA)
+    return database_path
+
+
+def execute(database: Path, *, args: list[str | Path], stdin: str | None) -> str:
     command = [
         sys.executable,
         "-W",
@@ -16,7 +37,7 @@ def execute(*, args: list[str], stdin: str | None) -> str:
         "-X",
         "dev",
         "add_dbsnp_ids.py",
-        DATABASE,
+        database,
         "/dev/stdin",
         *args,
     ]
@@ -35,14 +56,14 @@ def execute(*, args: list[str], stdin: str | None) -> str:
     return stdout
 
 
-def lookup(*, args: list[str], stdin: str) -> str:
-    return execute(args=["--action", "lookup", *args], stdin=stdin)
+def lookup(database: Path, *, args: list[str], stdin: str) -> str:
+    return execute(database, args=["--action", "lookup", *args], stdin=stdin)
 
 
 ########################################################################################
 
 
-def test_defaults() -> None:
+def test_defaults(database: Path) -> None:
     data_in = """CHROM POS NA REF ALT
 1 10043 OK T A
 1 10045 Missing C T
@@ -62,10 +83,10 @@ def test_defaults() -> None:
 2 10800 Unknown A C NA
 """
 
-    assert lookup(args=[], stdin=data_in) == data_out
+    assert lookup(database, args=[], stdin=data_in) == data_out
 
 
-def test_no_header_key_column_1() -> None:
+def test_no_header_key_column_1(database: Path) -> None:
     data_in = """1:10043:T:A OK bar
 1:10045:C:T Missing bar
 1:10051:A:G OK bar
@@ -83,10 +104,13 @@ def test_no_header_key_column_1() -> None:
 2:10800:A:C Unknown Chr NA
 """
 
-    assert lookup(args=["--no-header", "--key-column", "1"], stdin=data_in) == data_out
+    assert (
+        lookup(database, args=["--no-header", "--key-column", "1"], stdin=data_in)
+        == data_out
+    )
 
 
-def test_no_header_key_column_named() -> None:
+def test_no_header_key_column_named(database: Path) -> None:
     data_in = """name key status other
 blah 1:10043:T:A OK bar
 blah 1:10045:C:T Missing bar
@@ -106,10 +130,10 @@ blah 1:10109:A:T OK bar rs376007522
 blah 2:10800:A:C Unknown Chr NA
 """
 
-    assert lookup(args=["--key-column", "key"], stdin=data_in) == data_out
+    assert lookup(database, args=["--key-column", "key"], stdin=data_in) == data_out
 
 
-def test_no_header_key_column_2() -> None:
+def test_no_header_key_column_2(database: Path) -> None:
     data_in = """OK 1:10043:T:A bar
 Missing 1:10045:C:T bar
 OK 1:10051:A:G bar
@@ -127,4 +151,7 @@ OK 1:10109:A:T bar rs376007522
 Unknown 2:10800:A:C Chr NA
 """
 
-    assert lookup(args=["--no-header", "--key-column", "2"], stdin=data_in) == data_out
+    assert (
+        lookup(database, args=["--no-header", "--key-column", "2"], stdin=data_in)
+        == data_out
+    )

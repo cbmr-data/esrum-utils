@@ -11,7 +11,7 @@ nox.options.sessions = [
 SOURCES = ("add_dbsnp_ids.py",)
 
 
-RUFF_REQUIREMENT = "ruff==0.9.0"
+RUFF_REQUIREMENT = "ruff==0.15.6"
 
 
 @nox.session

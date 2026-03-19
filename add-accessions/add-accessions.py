@@ -68,6 +68,10 @@ def read_identifiers(filepath: Path) -> Iterator[tuple[str, int, str, str, str]]
                 yield current_chr, current_pos, last_ref, last_alt, last_value
 
         for line in progress(handle, desc="load "):
+            line = line.strip()
+            if not line:
+                continue
+
             position, value = line.split()
             chrom, position, refs, alts = split_key(position, maxsplit=3)
             position = int(position)
@@ -283,8 +287,8 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="X",
         choices=("index", "lookup"),
         default="lookup",
-        help="Either create a new index file or look up positions and add IDs to a "
-        "whitespace separated table",
+        help="Either 'index' a containing keys and IDs, or 'lookup' positions and add "
+        "IDs to a whitespace separated table",
     )
     parser.add_argument(
         "--key-column",
