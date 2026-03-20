@@ -214,7 +214,7 @@ def process_file(
 
     # 6. Ensure that processed files are in place before unlinking source
     if os.path.lexists(target):
-        error("target race condition; skipping:", quote_path(target))
+        error("target race condition; skipping: ", quote_path(target))
         return ("target_exists", stats.st_size, stats.st_size)
 
     eprint(f"    -> compressed to {ratio * 100:.1f}%")
@@ -223,7 +223,7 @@ def process_file(
     try:
         source.unlink()
     except PermissionError:
-        error("could not remove old file; reverting:", quote_path(target))
+        error("could not remove old file; reverting: ", quote_path(target))
         target_txt.unlink()
         target.unlink()
         return ("permissions", stats.st_size, stats.st_size)
