@@ -5,14 +5,7 @@ This script monitors the output from `sinfo` and reports when nodes become acces
 ## Execution
 
 ```bash
-# Suggested setup:
-pip install --user pipx
-pipx install uv
-uv venv
-. .venv/bin/activate.sh
-uv pip install -r requirements.txt
-# Required modules must have been installed in active environment
-python3 ./monitor-sinfo.py deploy.toml
+uv run python3 ./monitor-sinfo.py deploy.toml
 ```
 
 ## Configuration
@@ -39,7 +32,7 @@ The script `sim-sinfo.py` is provided for simulating the output of `sinfo` for t
 
 ```bash
 # Initialize simulator with 13 nodes with random states
-python3 sinfo-sim.py --init 13
+uv run python3 sinfo-sim.py --init 13
 # Run monitor-sinfo.py using `sinfo-sim.py` instead of `sinfo`
-python3 monitor-sinfo.py test.toml --dry-run --interval 0.1 --sinfo ./sinfo-sim.py
+uv run python3 monitor-sinfo.py test.toml --dry-run --interval 0.1 --sinfo ./sinfo-sim.py
 ```
