@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "monitor-members"
 dynamic = ["version"]
 
-requires-python = ">=3.9.0"
+requires-python = ">=3.11.0"
 dependencies = [
     "coloredlogs~=15.0.1",
     "koda-validate~=4.2.0",
@@ -25,9 +25,6 @@ monitor_members = "monitor_members.__main__:main_w"
 
 [tool.hatch.version]
 path = "src/monitor_members/__init__.py"
-
-[tool.uv]
-reinstall-package = ["paleomix"]
 
 [dependency-groups]
 dev = ["nox>=2024.10.9"]

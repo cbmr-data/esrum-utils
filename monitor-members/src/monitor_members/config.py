@@ -25,7 +25,7 @@ _LOG = logging.getLogger("config")
 
 @dataclasses.dataclass
 class Slack:
-    urls: dict[str, str] = dataclasses.field(default_factory=list[str])
+    urls: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
 
 
 @dataclasses.dataclass

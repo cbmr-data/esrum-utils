@@ -12,7 +12,7 @@ class Sacctmgr:
         self,
         cluster: str,
         account: str,
-        executable: str = "sacctmgr",
+        executable: str,
     ) -> None:
         self._account = account.lower()
         self._cluster = cluster.lower()

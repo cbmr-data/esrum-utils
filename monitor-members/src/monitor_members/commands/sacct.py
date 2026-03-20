@@ -56,7 +56,7 @@ class Args(tap.TypedArgs):
     interval: float = tap.arg(
         type=parse_duration,
         metavar="N",
-        default=0,
+        default=0.0,
         help="Repeat monitoring steps every N seconds, if value is greater than 0. "
         "Accepts units 'd', 'h', 'm', and 's', for days, hours, minutes and seconds",
     )
@@ -146,7 +146,12 @@ def main(args: Args) -> int:
         verbose=True,
     )
 
-    manager = Sacctmgr(cluster=sacct.cluster, account=sacct.account)
+    manager = Sacctmgr(
+        cluster=sacct.cluster,
+        account=sacct.account,
+        executable=args.sacctmgr_exe,
+    )
+
     failed_commands: set[tuple[str, ...]] = set()
 
     for _ in kerb.authenticated_loop(
