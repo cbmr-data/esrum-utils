@@ -56,10 +56,10 @@ def parse_slurm_output(text: str) -> Iterator[dict[str, str]]:
 
 
 def values_or_nan(values: Iterable[float]) -> list[float]:
-    """Return list of non-NAN values, or NAN if therer are no non-NAN values"""
+    """Return list of non-NAN values, or NAN if there are no non-NAN values"""
     values = [value for value in values if not math.isnan(value)]
 
-    return values if values else [math.nan]
+    return values or [math.nan]
 
 
 #######################################################################################
@@ -283,7 +283,6 @@ def run_sacct(
     user: str | None,
     truncate: bool,
     group: str | None,
-    partition: str | None,
     jobs: str | None,
     state: str | None,
 ) -> str | None:
@@ -310,8 +309,6 @@ def run_sacct(
         command.append("--truncate")
     if group is not None:
         command.append(f"--group={group}")
-    if partition is not None:
-        command.append(f"--partition={partition}")
     if jobs is not None:
         command.append(f"--jobs={jobs}")
     if state is not None:
@@ -434,24 +431,24 @@ def update_running_jobs(jobs: list[Usage]) -> bool:
 
 
 def aggregate_statistics(jobs: list[Usage]) -> list[Usage]:
-    aggregated: dict[tuple[bool, str], Usage] = {}
+    by_user: dict[str, Usage] = {}
     for it in jobs:
-        key = (it.has_measurements, it.user)
-        merged = aggregated.get(key)
-        if merged is None:
-            user = Usage(
-                job=it.user,
-                raw_job=it.user,
-                user=it.user,
-                name="*",
-                state="*",
-            )
-            user.jobs.append(it)
-            aggregated[key] = user
-        else:
-            merged.jobs.append(it)
+        if it.has_measurements:
+            merged = by_user.get(it.user)
+            if merged is None:
+                user = Usage(
+                    job=it.user,
+                    raw_job=it.user,
+                    user=it.user,
+                    name="*",
+                    state="*",
+                )
+                user.jobs.append(it)
+                by_user[it.user] = user
+            else:
+                merged.jobs.append(it)
 
-    return list(aggregated.values())
+    return list(by_user.values())
 
 
 def sort_table(
@@ -620,13 +617,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         dest="group",
         help="Show jobs belonging to group(s); see `man sacct`",
     )
-    parser.add_argument(
-        "-r",
-        "--partition",
-        metavar="PARTITION",
-        dest="partition",
-        help="Show jobs on partition; see `man sacct`",
-    )
 
     parser.add_argument(
         "-j",
@@ -682,7 +672,6 @@ def main(argv: list[str]) -> int:
         user=args.user,
         truncate=args.truncate,
         group=args.group,
-        partition=args.partition,
         jobs=args.jobs,
         state=args.state,
     )
