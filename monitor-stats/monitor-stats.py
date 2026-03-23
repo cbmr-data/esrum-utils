@@ -122,7 +122,7 @@ class Summary:
         procs: set[IntensiveProcess] = set()
         if "Memory" in self.system:
             procs.update(self.top_processes_by_mem)
-        elif "%CPU" in self.system or "LoadAvg" in self.system:
+        if "%CPU" in self.system or "LoadAvg" in self.system:
             procs.update(self.top_processes_by_cpu)
 
         return procs
