@@ -1,6 +1,6 @@
 # Example configuration file for `monitor-stats`
 
-# Listen with `nc -kl localhost 12345`
+# Listen with `while true;do nc -lN localhost 12345;echo;done`
 slack_webhooks = ["http://localhost:12345"]
 
 process_blacklist = [

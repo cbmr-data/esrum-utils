@@ -81,7 +81,7 @@ def format_time(seconds: float) -> str:
             fields.append(f"{value:02}" if fields else f"{value}")
 
     if not fields:
-        fields.append(f"{seconds:.1}")
+        fields.append(f"{seconds:.1f}")
 
     fields[-1] += "s"
     return ":".join(fields)
@@ -414,7 +414,7 @@ class SlackNotifier:
             elements.append(
                 {
                     "type": "text",
-                    "text": " running for {format_time(runtime)}",
+                    "text": f" running for {format_time(runtime)}",
                 },
             )
 
