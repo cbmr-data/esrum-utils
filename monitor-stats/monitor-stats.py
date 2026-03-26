@@ -259,10 +259,10 @@ class Monitor:
                         ) -> bool:
                             return any(flt.search(cmdline) for flt in lst)
 
-                        if is_on_list(self._process_whitelist, "whitelist"):
+                        if is_on_list(self._process_whitelist, cmdline):
                             # do nothing; processed ignored subsequently
                             _info("whitelisted PID %i (%s): %s", pid, user, cmdline)
-                        elif is_on_list(self._process_blacklist, "blacklist"):
+                        elif is_on_list(self._process_blacklist, cmdline):
                             _warning("blacklisted PID %i (%s): %s", pid, user, cmdline)
                             processes.append(
                                 BlacklistedProcess(
