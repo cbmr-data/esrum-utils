@@ -137,9 +137,6 @@ class Monitor:
         min_process_uid: int,
         max_process_age: float,
     ) -> None:
-        self._last_time: float = time.time()
-        self._last_cpu_stat: float = 0.0
-
         self._process_whitelist: tuple[re.Pattern[str], ...] = tuple(
             re.compile(it) for it in process_whitelist
         )
@@ -159,12 +156,12 @@ class Monitor:
     def get(self) -> Summary:
         processes = self._get_processes()
 
-        current_time = time.time()
-        since_last = current_time - self._last_time
-        self._last_time = current_time
-
         return Summary(
-            system=self._get_metrics(since_last),
+            system={
+                "%CPU": psutil.cpu_percent(),
+                "LoadAvg": self._get_loadavg(),
+                "Memory": self._get_mem_usage(),
+            },
             blacklisted=self._get_blacklisted_processes(),
             top_processes_by_cpu=self._filter_processes(
                 processes,
@@ -207,13 +204,6 @@ class Monitor:
         processes.sort(key=key, reverse=True)
 
         return processes[:n]
-
-    def _get_metrics(self, since_last: float) -> dict[Metrics, float]:
-        return {
-            "%CPU": self._get_cpu_load(since_last),
-            "LoadAvg": self._get_loadavg(),
-            "Memory": self._get_mem_usage(),
-        }
 
     def _get_blacklisted_processes(self) -> list[BlacklistedProcess]:
         processes: list[BlacklistedProcess] = []
@@ -291,21 +281,6 @@ class Monitor:
             return float(loadavg[2])  # avg. last fifteen minutes
         else:
             raise NotImplementedError(self._get_loadavg)
-
-    def _get_cpu_load(self, since_last: float) -> float:
-        cpus = 0
-        jiffies = 0
-        with PATH_CPU_STATS.open("rb") as handle:
-            for line in handle:
-                if line.startswith(b"cpu "):
-                    stats = line.split()
-                    jiffies += float(stats[1]) + float(stats[2]) + float(stats[3])
-                elif line.startswith(b"cpu"):
-                    cpus += 1
-
-        self._last_cpu_stat, last_cpu_stat = jiffies, self._last_cpu_stat
-
-        return (jiffies - last_cpu_stat) / cpus / since_last
 
     @classmethod
     def _get_mem_usage(cls) -> float:
