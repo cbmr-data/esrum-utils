@@ -86,7 +86,7 @@ def parse_n_to_gb(value: str) -> float:
         multiplier = 1
     else:
         if value.endswith("K"):
-            multiplier = 1042**-2
+            multiplier = 1024**-2
         elif value.endswith("M"):
             multiplier = 1024**-1
         elif value.endswith("G"):

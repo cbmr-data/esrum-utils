@@ -27,7 +27,7 @@ Add variants to a table of variants:
 $ cat my-variants.txt
 CHROM  POS    REF  ALT
 1      10039  A    C
-$ python3 add-accessions.py --action index my-keys.database my-variants.txt
+$ python3 add-accessions.py --action lookup my-keys.database my-variants.txt
 CHROM  POS    REF  ALT rsID
 1      10039  A    C   rs978760828
 Found IDs for 1 of 1 records (100.0%), 0 not found
