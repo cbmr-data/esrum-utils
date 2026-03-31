@@ -10,7 +10,7 @@ requires-python = ">=3.11.0"
 dependencies = [
     "coloredlogs~=15.0.1",
     "koda-validate~=4.2.0",
-    "requests~=2.32.3",
+    "requests~=2.33.0",
     "sqlalchemy[mypy]~=2.0.35",
     "tomli~=2.0.2",
     "typing_extensions>=4.0",

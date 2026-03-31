@@ -6,7 +6,7 @@ requires-python = ">=3.10.0"
 dependencies = [
     "coloredlogs==15.0.1",
     "koda-validate==4.1.1",
-    "requests~=2.32.3",
+    "requests~=2.33.0",
     "tomli==2.0.1",
     "typing-extensions==4.11.0",
 ]

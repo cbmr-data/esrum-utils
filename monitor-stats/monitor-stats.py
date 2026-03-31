@@ -5,11 +5,10 @@
 #     "coloredlogs==15.0.1",
 #     "koda-validate==4.1.1",
 #     "psutil==7.2.1",
-#     "requests~=2.32.3",
+#     "requests~=2.33.0",
 #     "tomli==2.0.1",
 #     "typing-extensions==4.11.0",
 # ]
-# exclude-newer = "2026-01-21T00:00:00Z"
 # ///
 from __future__ import annotations
 
