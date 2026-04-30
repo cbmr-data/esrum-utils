@@ -23,6 +23,7 @@ import shlex
 import socket
 import sys
 import time
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path, PosixPath
@@ -104,10 +105,31 @@ class IntensiveProcess:
 
 @dataclass
 class BlacklistedProcess:
-    pid: int
+    pids: list[int]
     uid: int
     cmd: str
     runtime: float
+
+    @staticmethod
+    def merge(procs: list[BlacklistedProcess]) -> list[BlacklistedProcess]:
+        """Merge identical commands; mostly intended for rsync"""
+        runtimes: dict[tuple[int, str], float] = defaultdict(float)
+        pids: dict[tuple[int, str], list[int]] = defaultdict(list)
+
+        for it in procs:
+            key = (it.uid, it.cmd)
+            runtimes[key] += it.runtime
+            pids[key].extend(it.pids)
+
+        return [
+            BlacklistedProcess(
+                pids=pids[(uid, cmd)],
+                uid=uid,
+                cmd=cmd,
+                runtime=runtime,
+            )
+            for (uid, cmd), runtime in runtimes.items()
+        ]
 
 
 @dataclass
@@ -255,7 +277,7 @@ class Monitor:
                             _warning("blacklisted PID %i (%s): %s", pid, user, cmdline)
                             processes.append(
                                 BlacklistedProcess(
-                                    pid=pid,
+                                    pids=[pid],
                                     uid=stat.st_uid,
                                     cmd=cmdline,
                                     runtime=runtime,
@@ -327,7 +349,7 @@ class SlackNotifier:
                         [
                             self._add_process(
                                 uid=it.uid,
-                                pid=it.pid,
+                                pids=[it.pid],
                                 cmdline=it.cmd,
                                 cpu_mem=(it.cpu, it.mem),
                             )
@@ -344,11 +366,11 @@ class SlackNotifier:
                     [
                         self._add_process(
                             uid=it.uid,
-                            pid=it.pid,
+                            pids=it.pids,
                             cmdline=it.cmd,
                             runtime=it.runtime,
                         )
-                        for it in summary.blacklisted
+                        for it in BlacklistedProcess.merge(summary.blacklisted)
                     ],
                 )
             )
@@ -396,15 +418,21 @@ class SlackNotifier:
         cls,
         *,
         uid: int,
-        pid: int,
+        pids: list[int],
         cmdline: str,
         runtime: float | None = None,
         cpu_mem: tuple[float, float] | None = None,
     ) -> JSON:
         username = get_username(uid)
+        if len(pids) > 1:
+            head = ", ".join(map(str, pids[:-1]))
+            pidlist = f"{head}, and {pids[-1]}"
+            elements: JSON = [{"type": "text", "text": f"Processes {pidlist} ("}]
+        else:
+            (pid,) = pids
+            elements: JSON = [{"type": "text", "text": f"Process {pid} ("}]
 
-        elements: JSON = [
-            {"type": "text", "text": f"Process {pid} ("},
+        elements += [
             {"type": "text", "style": {"italic": True}, "text": username},
             {"type": "text", "text": ")"},
         ]
