@@ -99,7 +99,7 @@ class IntensiveProcess:
     def cmd(self) -> str:
         try:
             return " ".join(map(shlex.quote, self.proc.cmdline()))
-        except (FileNotFoundError, PermissionError):
+        except (FileNotFoundError, PermissionError, psutil.ZombieProcess):
             return "<error getting commandline>"
 
 
