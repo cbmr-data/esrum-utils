@@ -133,8 +133,40 @@ class BlacklistedProcess:
 
 
 @dataclass
+class SystemTimes:
+    user: float
+    system: float
+    idle: float
+
+    @classmethod
+    def now(cls) -> SystemTimes:
+        times = psutil.cpu_times()
+
+        return SystemTimes(
+            user=times.user,
+            system=times.system,
+            idle=times.idle,
+        )
+
+    def since(self, last: SystemTimes) -> SystemTimes:
+        return SystemTimes(
+            user=max(0.0, self.user - last.user),
+            system=max(0.0, self.system - last.system),
+            idle=max(0.0, self.idle - last.idle),
+        )
+
+    def __str__(self) -> str:
+        total = (self.user + self.system + self.idle) / 100
+        user = self.user / total
+        system = self.system / total
+        idle = self.idle / total
+        return f"user: {user:.1f}%, system: {system:.1f}%, idle: {idle:.1f}%"
+
+
+@dataclass
 class Summary:
     system: dict[Metrics, float]
+    extras: dict[Metrics, str]
     blacklisted: list[BlacklistedProcess]
     top_processes_by_cpu: list[IntensiveProcess]
     top_processes_by_mem: list[IntensiveProcess]
@@ -169,6 +201,7 @@ class Monitor:
         self._loadavg_measure = loadavg_measure
         self._min_process_uid = min_process_uid
         self._max_process_age = max_process_age
+        self._last_system_times = SystemTimes.now()
         self.processes_mem: list[IntensiveProcess] = []
         self.processes_cpu: list[IntensiveProcess] = []
 
@@ -176,12 +209,18 @@ class Monitor:
 
     def get(self) -> Summary:
         processes = self._get_processes()
+        system_times_now = SystemTimes.now()
+        system_times_delta = system_times_now.since(self._last_system_times)
+        self._last_system_times = system_times_now
 
         return Summary(
             system={
                 "%CPU": psutil.cpu_percent(),
                 "LoadAvg": self._get_loadavg(),
                 "Memory": self._get_mem_usage(),
+            },
+            extras={
+                "%CPU": str(system_times_delta),
             },
             blacklisted=self._get_blacklisted_processes(),
             top_processes_by_cpu=self._filter_processes(
@@ -336,7 +375,7 @@ class SlackNotifier:
                 self._add_entry(
                     f"Resource usage at {self._host} exceeds thresholds",
                     [
-                        self._add_metrics(key, value)
+                        self._add_metrics(key, value, extra=summary.extras.get(key))
                         for key, value in summary.system.items()
                     ],
                 )
@@ -405,13 +444,15 @@ class SlackNotifier:
         }
 
     @classmethod
-    def _add_metrics(cls, name: str, value: float) -> JSON:
-        return {
-            "type": "rich_text_section",
-            "elements": [
-                {"type": "text", "text": f" {name} is currently at {value:.2f}"},
-            ],
-        }
+    def _add_metrics(cls, name: str, value: float, extra: str | None = None) -> JSON:
+        elems: JSON = [
+            {"type": "text", "text": f" {name} is currently at {value:.2f}"},
+        ]
+
+        if extra is not None:
+            elems.append({"type": "text", "text": f"; {extra}"})
+
+        return {"type": "rich_text_section", "elements": elems}
 
     @classmethod
     def _add_process(
@@ -667,7 +708,6 @@ def main(argv: list[str]) -> int:
 
     while True:
         time.sleep(args.loop)
-
         stats: dict[Metrics, float] = {}
         summary = monitor.get()
         for key, value in summary.system.items():
