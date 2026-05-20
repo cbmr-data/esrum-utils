@@ -24,7 +24,7 @@ import socket
 import sys
 import time
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path, PosixPath
 from typing import Callable, Literal, NoReturn, TypeAlias, Union
@@ -197,6 +197,7 @@ class Monitor:
             re.compile(it) for it in process_blacklist
         )
 
+        self._known_processes: dict[int, tuple[float, float]] = {}
         self._pid_whitelist: dict[int, float] = {}
         self._loadavg_measure = loadavg_measure
         self._min_process_uid = min_process_uid
@@ -208,7 +209,8 @@ class Monitor:
         self.get()
 
     def get(self) -> Summary:
-        processes = self._get_processes()
+        self._known_processes, processes = self._get_processes(self._known_processes)
+
         system_times_now = SystemTimes.now()
         system_times_delta = system_times_now.since(self._last_system_times)
         self._last_system_times = system_times_now
@@ -235,23 +237,40 @@ class Monitor:
             ),
         )
 
-    @staticmethod
-    def _get_processes() -> list[IntensiveProcess]:
+    def _get_processes(
+        self,
+        known_processes: Mapping[int, tuple[float, float]],
+    ) -> tuple[dict[int, tuple[float, float]], list[IntensiveProcess]]:
         processes: list[IntensiveProcess] = []
+        updated_processes: dict[int, tuple[float, float]] = {}
         for proc in psutil.process_iter():
             # Ignore processes that terminated before we can inspect them
             with contextlib.suppress(psutil.NoSuchProcess):
-                processes.append(
-                    IntensiveProcess(
-                        pid=proc.pid,
-                        uid=proc.uids().effective,
-                        cpu=proc.cpu_percent(interval=None) / 100,
-                        mem=proc.memory_percent(),
-                        proc=proc,
-                    )
+                # We also need CPU usage for newly spawned processes, so utilization is
+                # counted manually and from the process creation time for new processes
+                prev_time, prev_cpu_times = known_processes.get(
+                    proc.pid, (proc.create_time(), 0.0)
                 )
 
-        return processes
+                curr_time = time.time()
+                cpu_times = proc.cpu_times()
+                curr_cpu_times = cpu_times.user + cpu_times.system
+
+                updated_processes[proc.pid] = (curr_time, curr_cpu_times)
+
+                age = curr_time - prev_time
+                if age > 0.0:
+                    processes.append(
+                        IntensiveProcess(
+                            pid=proc.pid,
+                            uid=proc.uids().effective,
+                            cpu=(curr_cpu_times - prev_cpu_times) / max(age, 0.001),
+                            mem=proc.memory_percent(),
+                            proc=proc,
+                        )
+                    )
+
+        return updated_processes, processes
 
     @staticmethod
     def _filter_processes(
