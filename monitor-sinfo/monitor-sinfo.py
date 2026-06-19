@@ -107,8 +107,8 @@ class KodaJSONEncoder(json.JSONEncoder):
     def default(self, o: object) -> object:
         if isinstance(o, datetime):
             return o.isoformat()
-        elif is_dataclass(o):
-            return asdict(o)  # pyright: ignore[reportArgumentType]
+        elif is_dataclass(o) and not isinstance(o, type):
+            return asdict(o)
 
         return super().default(o)
 
