@@ -57,10 +57,17 @@ class Status:
     reason: str | None
     is_responding: bool
 
-    def __init__(self, *, state: str, reason: str | None) -> None:
-        self.state = state.removesuffix("*")
-        self.reason = (reason.strip() if reason else None) or None
-        self.is_responding = not state.endswith("*")
+    @classmethod
+    def parse(cls, *, state: str, reason: str | None) -> Status:
+        # Responding/not responding is not interesting for nodes in a bad state
+        if state in _BAD_STATES:
+            state = state.rstrip("*")
+
+        return Status(
+            state=state.removesuffix("*"),
+            reason=(reason.strip() if reason else None) or None,
+            is_responding=not state.endswith("*"),
+        )
 
     @property
     def is_bad_state(self) -> bool:
@@ -481,11 +488,7 @@ def collect_node_status(sinfo: str) -> dict[str, Status] | None:
         name = row["NODELIST"]
         state = row["STATE"]
 
-        # Responding/not responding is not interesting for nodes in a bad state
-        if state in _BAD_STATES:
-            state = state.rstrip("*")
-
-        result[name] = Status(state=state, reason=reason)
+        result[name] = Status.parse(state=state, reason=reason)
 
     return result
 
@@ -521,7 +524,7 @@ def diff_node_states(
     for key in set(prev_states) - set(curr_states):
         updates[key] = StatusChange(
             change=ChangeType.Removed,
-            new=Status(state="unk", reason=None),
+            new=Status(state="unk", reason=None, is_responding=True),
             old=None,
         )
 
