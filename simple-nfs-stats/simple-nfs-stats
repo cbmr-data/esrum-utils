@@ -79,6 +79,10 @@ class Snapshot(NamedTuple):
     write_total_ops: int = 0
     write_total_time: int = 0
 
+    other_total: int = 0
+    other_total_ops: int = 0
+    other_total_time: int = 0
+
 
 @dataclass
 class NFSData:
@@ -103,9 +107,10 @@ class DeviceData:
 
     def __init__(self, lines: list[str]) -> None:
         self.nfs_data = NFSData()
-        self.rpc_data: dict[Literal["READ", "WRITE"], RPCOps] = {
+        self.rpc_data: dict[Literal["READ", "WRITE", "OTHER"], RPCOps] = {
             "READ": RPCOps(),
             "WRITE": RPCOps(),
+            "OTHER": RPCOps(),
         }
         self.mountpoints = {}
         self._parse_stats(lines)
@@ -124,11 +129,15 @@ class DeviceData:
             self.nfs_data.serverwritebytes = int(words[6])
 
     def _parse_rpc_line(self, words: list[str]) -> None:
-        if words[0] not in ("RPC", "xprt:", "per-op"):
-            op = words[0][:-1]
+        op = words[0]
+        if op.isupper() and op.endswith(":"):
+            op = op.rstrip(":")
             if op in ("READ", "WRITE"):
                 self.rpc_data[op].ops_count = int(words[1])
                 self.rpc_data[op].ops_time = int(words[8])
+            else:
+                self.rpc_data["OTHER"].ops_count = int(words[1])
+                self.rpc_data["OTHER"].ops_time = int(words[8])
 
     def _parse_stats(self, lines: list[str]) -> None:
         """Turn a list of lines from a mount stat file into a
@@ -157,10 +166,10 @@ class DeviceData:
     def server_write_bytes(self) -> int:
         return self.nfs_data.serverwritebytes
 
-    def operation_count(self, op: Literal["READ", "WRITE"]) -> int:
+    def operation_count(self, op: Literal["READ", "WRITE", "OTHER"]) -> int:
         return self.rpc_data[op].ops_count
 
-    def cumulative_request_time(self, op: Literal["READ", "WRITE"]) -> int:
+    def cumulative_request_time(self, op: Literal["READ", "WRITE", "OTHER"]) -> int:
         return self.rpc_data[op].ops_time
 
     def is_nfs_mountpoint(self) -> bool:
@@ -204,6 +213,9 @@ def parse_proc() -> list[Snapshot]:
                 write_total=stats.server_write_bytes,
                 write_total_ops=stats.operation_count("WRITE"),
                 write_total_time=stats.cumulative_request_time("WRITE"),
+                other_total=0,
+                other_total_ops=stats.operation_count("OTHER"),
+                other_total_time=stats.cumulative_request_time("OTHER"),
             )
 
             snapshots.append(ss)
@@ -257,8 +269,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         metavar="MS",
         type=float,
         default=0.0,
-        help="Do not print updates if the average ops time for both reads and writes "
-        "is less than MS milliseconds",
+        help="Do not print updates if the average ops time is less than MS "
+        "milliseconds for reads, writes, and other operations",
     )
 
     return parser.parse_args(argv)
@@ -276,6 +288,7 @@ def main(argv: list[str]) -> int:
         "ReadOpsTime",
         "WriteMiBpS",
         "WriteOpsTime",
+        "OtherOpsTime",
         "MountPoints",
     ]
 
@@ -317,7 +330,8 @@ def main(argv: list[str]) -> int:
 
             curr_read_time = curr_stats.read_total_time - prev_stats.read_total_time
             curr_write_time = curr_stats.write_total_time - prev_stats.write_total_time
-            if curr_read_time < 0 or curr_write_time < 0:
+            curr_other_time = curr_stats.other_total_time - prev_stats.other_total_time
+            if curr_read_time < 0 or curr_write_time < 0 or curr_other_time < 0:
                 print(f"WARNING: Misidentified mount point {key!r}", file=sys.stderr)
                 continue
 
@@ -326,12 +340,14 @@ def main(argv: list[str]) -> int:
 
             curr_read_ops = curr_stats.read_total_ops - prev_stats.read_total_ops
             curr_write_ops = curr_stats.write_total_ops - prev_stats.write_total_ops
+            curr_other_ops = curr_stats.other_total_ops - prev_stats.other_total_ops
 
             if (
                 args.min_ops_time > 0
                 and max(
                     curr_read_time / (curr_read_ops or 1),
                     curr_write_time / (curr_write_ops or 1),
+                    curr_other_time / (curr_other_ops or 1),
                 )
                 < args.min_ops_time
             ):
@@ -345,6 +361,7 @@ def main(argv: list[str]) -> int:
                     "ReadMiBpS": bytes_to_megabytes(curr_read / curr_timedelta),
                     "WriteOpsTime": human_ops_time(curr_write_time, curr_write_ops),
                     "WriteMiBpS": bytes_to_megabytes(curr_write / curr_timedelta),
+                    "OtherOpsTime": human_ops_time(curr_other_time, curr_other_ops),
                     "MountPoints": key,
                 }
 
