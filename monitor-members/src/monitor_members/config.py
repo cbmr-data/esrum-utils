@@ -41,6 +41,7 @@ class LDAP:
     sensitive_groups: list[str] = dataclasses.field(default_factory=list[str])
     mandatory_groups: list[str] = dataclasses.field(default_factory=list[str])
     groups: list[str] = dataclasses.field(default_factory=list[str])
+    sensitive_users: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
 
 
 @dataclasses.dataclass

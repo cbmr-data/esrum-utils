@@ -126,6 +126,7 @@ def main(args: Args) -> int:
                         displaynames[change.user] = ldap.display_name(change.user)
 
                 report_sent = notifier.send_ldap_notification(
+                    sensitive_users=conf.ldap.sensitive_users,
                     displaynames=displaynames,
                     changes=changes,
                 )

@@ -62,6 +62,12 @@ groups = [
     "SRV-esrumhead-users",
 ]
 
+# List of sensitive users, for whom extra attention is required
+sensitive_users = {
+    # The message may include user-pings in the form "<@ABC1234>"
+    # "*username-glob*": "Non-empty message included with notifications",
+}
+
 # Settings relating to the `sacct` monitoring command
 [sacct]
 

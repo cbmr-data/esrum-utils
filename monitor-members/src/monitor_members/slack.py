@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import fnmatch
 import json
 import logging
+import re
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import groupby
@@ -12,9 +14,10 @@ import requests
 from monitor_members.common import pretty_list_t
 from monitor_members.database import ChangeType, GroupChange
 
+JSONList: TypeAlias = list[Union[float, str, bool, "JSON"]]
 JSON: TypeAlias = dict[
     str,
-    Union[float, str, bool, "JSON", list[Union[float, str, bool, "JSON"]]],
+    Union[float, str, bool, "JSON", JSONList],
 ]
 
 
@@ -30,12 +33,13 @@ class SlackNotifier:
         *,
         displaynames: dict[str, str | None],
         changes: Iterable[GroupChange],
+        sensitive_users: dict[str, str],
     ) -> bool:
         if not self._webhooks:
             self._log.warning("Slack LDAP update not sent; no webhooks configured")
             return False
 
-        elements: list[float | str | bool | JSON] = []
+        elements: JSONList = []
 
         # changes grouped by user
         user_updates: dict[str, list[GroupChange]] = defaultdict(list)
@@ -46,29 +50,28 @@ class SlackNotifier:
             return (sum(-1 for change in it[1] if change.warning), it[0])
 
         for user, updates in sorted(user_updates.items(), key=_sort_key):
+            messages = [
+                message
+                for glob, message in sensitive_users.items()
+                if fnmatch.fnmatch(name=user.lower(), pat=glob.lower())
+            ]
+            alert = "; ".join(messages) if messages else None
+            if alert is not None:
+                self._log.warning("sensitive user %r: %s", user, alert)
+
             elements.append(
-                self._add_user(
+                self._describe_user_changes(
                     username=user,
                     displayname=displaynames[user],
                     updates=updates,
+                    alert=alert is not None,
                 )
             )
 
-        blocks: list[JSON] = [
-            {
-                "type": "rich_text",
-                "elements": [
-                    {
-                        "type": "rich_text_list",
-                        "style": "bullet",
-                        "indent": 0,
-                        "elements": elements,
-                    },
-                ],
-            },
-        ]
+            if alert is not None:
+                elements.append(self._add_user_alert(alert))
 
-        return self._send_message(blocks)
+        return self._send_message([{"type": "rich_text", "elements": elements}])
 
     def send_error_message(self, *, what: str, stderr: str = "") -> bool:
         if not self._webhooks:
@@ -90,16 +93,30 @@ class SlackNotifier:
             ]
         )
 
-    def _add_user(
+    @staticmethod
+    def _rich_text_list(elements: JSONList, *, indent: int = 0) -> JSON:
+        return {
+            "type": "rich_text_list",
+            "style": "bullet",
+            "indent": indent,
+            "elements": elements,
+        }
+
+    def _describe_user_changes(
         self,
+        *,
         username: str,
         displayname: str | None,
         updates: list[GroupChange],
+        alert: bool,
     ) -> JSON:
         updates.sort(key=lambda it: (not it.warning, it.group))
         elements: list[float | str | bool | JSON] = []
 
-        if any(it.warning for it in updates):
+        if alert:
+            elements.append({"type": "emoji", "name": "octagonal_sign"})
+            elements.append({"type": "text", "text": " "})
+        elif any(it.warning for it in updates):
             elements.append({"type": "emoji", "name": "warning"})
             elements.append({"type": "text", "text": " "})
 
@@ -113,10 +130,36 @@ class SlackNotifier:
 
         elements.extend(self.add_change_section(username=username, updates=updates))
 
-        return {
-            "type": "rich_text_section",
-            "elements": elements,
-        }
+        return self._rich_text_list(
+            [
+                {
+                    "type": "rich_text_section",
+                    "elements": elements,
+                }
+            ]
+        )
+
+    def _add_user_alert(self, alert: str) -> JSON:
+        elements: JSONList = [
+            {"type": "text", "text": "NOTICE: ", "style": {"bold": True}}
+        ]
+
+        pattern = r"(<@[A-Za-z0-9]+>)"
+        for chunk in re.split(pattern, alert):
+            if re.match(pattern, chunk):
+                elements.append({"type": "user", "user_id": chunk[2:-1]})
+            elif chunk:
+                elements.append({"type": "text", "text": chunk})
+
+        return self._rich_text_list(
+            [
+                {
+                    "type": "rich_text_section",
+                    "elements": elements,
+                }
+            ],
+            indent=1,
+        )
 
     def add_change_section(
         self,
