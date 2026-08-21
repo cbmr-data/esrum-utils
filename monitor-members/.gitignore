@@ -1,2 +1,3 @@
 *.toml
 *.json
+!pyproject.toml
