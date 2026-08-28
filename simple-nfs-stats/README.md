@@ -16,7 +16,7 @@ By default the script will check for and print IO activity every 5 seconds
     2024-09-10T10:54:49    2024-09-10T10:54:54    0            0              265           8867.3          /maps/projects/example/data
     2024-09-10T10:55:19    2024-09-10T10:55:24    0.01         15.0           0             0               /maps/direct/software
 
-The `MiBpS` columns report reads/writes in MiB per second and the `OpsTime` columns report the average waiting time for read/write operations.
+The `MiBpS` columns report reads/writes in MiB per second and the `OpsTime` columns report the average waiting time for read/write operations in milliseconds. Statistics are obtained from `/proc/self/mountstats`.
 
 To filter activity with low latency, use the `--min-ops-time` to skip updates where both `ReadOpsTime` and `WriteOpsTime` is below this value:
 
