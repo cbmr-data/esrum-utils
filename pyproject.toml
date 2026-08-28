@@ -5,53 +5,49 @@ typeCheckingMode = "strict"
 target-version = "py39"
 
 [tool.ruff.lint]
-select = ["ALL"]
+select = [
+  "ANN",  # flake8-annotations
+  "ARG",  # flake8-unused-arguments
+  "B",  # flake8-bugbear
+  "C4",  # flake8-comprehensions
+  "E",  # pycodestyle
+  "F",  # pyflakes
+  "FA",  # flake8-future-annotations
+  "FBT",  # flake8-boolean-trap (TODO)
+  "FLY",  # flynt
+  "I",  # isort
+  "INP",  # flake8-no-pep420
+  "LOG",  # flake8-logging
+  "G",  # flake8-logging-format
+  "PTH",  # flake8-use-pathlib (TODO)
+  "S",  # flake8-bandit
+  "UP",  # pyupgrade
+  "PT",  # flake8-pytest-style
+  "W",  # warning, pycodestyle
+  "N",  # pep8-naming (N)
+  "SIM",  # flake8-simplify
+  "PIE",  # flake8-pie
+  "PLE",  # pylint errors
+  "PYI",  # flake8-pyi
+  "RUF",  # ruff specific rules
+  "FURB",  # refurb
+  "TID",  # flake8-tidy-imports"
+  "PL",  # pylint
+]
 
 ignore = [
-    # Rules either deemed too burdonsome to implement or not useful
-    "C90", # mccabe -- Complexity measures not deemed useful
-    "COM", # flake8-commas -- Formatting handled by ruff/black
-    "D",   # pydocstyle
-    "EM",  # flake8-errmsg
-    "TRY", # tryceratops
-    # Individual rules deemed too burdonsome or not useful
-    "S603", # subprocess-without-shell-equals-true
-    # Disabled due to too many false positives
-    "PLR2004", # magic-value-comparison -- Magic value used in comparison
-    # Disabled due to personal style preferences
-    "PLW2901", # redefined-loop-name -- `for` loop variable `value` overwritten
-    "RET505",  # superfluous-else-return -- Unnecessary `elif` after `return` statement
-    "RET506",  # superfluous-else-raise -- Unnecessary `elif` after `raise` statement
-    "RET507",  # superfluous-else-continue --Unnecessary `elif` after `continue`
-    "RET508",  # superfluous-else-break -- Unnecessary `elif` after `break` statement
-    # Disabled due to hits in non-performance critical code where manual is clearer
-    "PERF401", # manual-list-comprehension -- Use a list comprehension
-    # Disabled due to conflict with `format` command
-    "ISC001", # single-line-implicit-string-concatenation
-    # Complexity warnings disabled for now
-    "PLR09", # too-many-*
-    "T20",   # flake8-print
-    "TD",    # flake8-todos
-    # Disabled to ensure identical behavior between execution/run-time
-    "TC002", # typing-only-third-party-import -- Move third-party import `...` into a type-checking block
-    "TC003", # typing-only-standard-library-import -- Move standard library import `...` into a type-checking block
-    # Try to avoid TYPE_CHECKING blocks to unify runtime/typechecking logic
-    "TC001", # typing-only-first-party-import
-    "TC002", # typing-only-third-party-import
-    "TC003", # typing-only-standard-library-import
+  "B904",  # flake8-bugbear -- raise-without-from-inside-except
+  "S311",  # flake8-bandit -- suspicious-non-cryptographic-random-usage
+  "S603",  # flake8-bandit -- subprocess-without-shell-equals-true
+  "S607",  # flake8-bandit -- start-process-with-partial-path
+  "UP032",  # pyupgrade -- f-string
+  "PLR09",  # pylint -- too-many-*
+  "PLR2004",  # pylint -- magic-value-comparison
+  "PLW2901",  # pylint -- redefined-loop-name
 ]
-
 
 [tool.ruff.lint.per-file-ignores]
-
-"*/noxfile.py" = [
-    "D",      # pydocstyle
-    "INP001", # implicit-namespace-package
-]
-
-"*/tests/**.py" = [
-    "D",    # pydocstyle
-    "S101", # assert -- Use of assert detected
-    "S108", # hardcoded-temp-file -- Probable insecure usage of temporary file or dir
-    "S311", # suspicious-non-cryptographic-random-usage
+"tests/**.py" = [
+  "S101",  # assert -- Use of assert detected
+  "S108",  # hardcoded-temp-file -- Probable insecure usage of temporary file or dir
 ]

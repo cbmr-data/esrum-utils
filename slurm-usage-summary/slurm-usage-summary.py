@@ -40,7 +40,7 @@ def parse_time(value: str) -> datetime | None:
     if value == "Unknown":
         return None
 
-    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")  # noqa: DTZ007
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
 
 
 def parse_range(start: datetime, end: datetime) -> Iterable[tuple[date, float]]:

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # pyright: strict
-# ruff: noqa: S311
 from __future__ import annotations
 
 import json

@@ -163,7 +163,7 @@ def main(argv: list[str]) -> int:
         elif stats.st_gid != gid:
             if not args.quiet:
                 print(
-                    "lchown {} since ownership is {}/{}".format(  # noqa: UP032
+                    "lchown {} since ownership is {}/{}".format(
                         quote(filepath),
                         get_user_name(stats.st_uid),
                         get_group_name(stats.st_gid),

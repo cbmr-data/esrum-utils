@@ -175,7 +175,7 @@ class Result:
 
 
 def count_files(root: Path, expected: set[Path]) -> Result:
-    result = Result(timestamp=datetime.now().isoformat())  # noqa: DTZ005
+    result = Result(timestamp=datetime.now().isoformat())
     result.expected = len(expected)
     result.found = 0
 

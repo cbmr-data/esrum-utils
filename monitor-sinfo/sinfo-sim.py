@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # ignore use of insecure RNG; only used for simulating sinfo states
-# ruff: noqa: S311
 from __future__ import annotations
 
 import argparse

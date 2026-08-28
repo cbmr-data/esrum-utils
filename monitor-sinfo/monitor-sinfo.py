@@ -327,7 +327,7 @@ class SlackNotifier(Notifier):
         block = SlackBlock("rich_text")
         block.add_element("rich_text_section").add_text(
             "Node status update for {}:\n\n".format(
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # noqa: DTZ005
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
         )
 
