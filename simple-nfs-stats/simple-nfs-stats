@@ -24,8 +24,10 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import os
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import zip_longest
 from pathlib import Path
@@ -60,6 +62,26 @@ def human_ops_time(ms: float, ops: int) -> str:
         return "0.1"
 
     return f"{duration:.1f}"
+
+
+class ColoredOps:
+    def __init__(self, ms: float, ops: int) -> None:
+        desc = human_ops_time(ms, ops)
+        if ops == 0 or (ms / ops) <= 1:
+            self.text = f"\033[90m{desc}\033[0m\033[0m"
+        elif (ms / ops) <= 10:
+            self.text = f"\033[33m{desc}\033[0m\033[0m"
+        else:
+            self.text = f"\033[31m{desc}\033[0m\033[0m"
+
+        self.len = len(desc)
+        self.adjust = len(self.text) - self.len
+
+    def __len__(self) -> int:
+        return self.len
+
+    def __str__(self) -> str:
+        return self.text
 
 
 def timestamp() -> datetime.datetime:
@@ -223,7 +245,11 @@ def parse_proc() -> list[Snapshot]:
     return snapshots
 
 
-def print_rows(rows: list[list[str]], *, indent: list[int] | None = None) -> None:
+def print_rows(
+    rows: list[list[str | ColoredOps]],
+    *,
+    indent: list[int] | None = None,
+) -> None:
     if indent is not None:
         for row in rows:
             lens = [len(value) + 4 for value in row]
@@ -233,10 +259,12 @@ def print_rows(rows: list[list[str]], *, indent: list[int] | None = None) -> Non
         indent[-1] = 0
 
         for row in rows:
-            print(
-                *(value.ljust(width) for width, value in zip(indent, row, strict=True)),
-                sep="",
-            )
+            justified_row: list[str] = []
+            for width, value in zip(indent, row, strict=True):
+                adjust = 0 if isinstance(value, str) else value.adjust
+                justified_row.append(str(value).ljust(width + adjust))
+
+            print(*justified_row, sep="")
     else:
         for row in rows:
             print(*row, sep="\t")
@@ -301,9 +329,13 @@ def main(argv: list[str]) -> int:
     missing = Snapshot(mountpoints={"NA": "NA"})
     time.sleep(args.interval)
 
+    format_ops_time: Callable[[float, int], str | ColoredOps] = human_ops_time
+    if sys.stdout.isatty() and os.environ.get("NO_COLOR") is None:
+        format_ops_time = ColoredOps
+
     first_loop = True
     while True:
-        rows: list[list[str]] = []
+        rows: list[list[str | ColoredOps]] = []
         if args.wipe or first_loop:
             first_loop = False
             if isatty:
@@ -354,14 +386,14 @@ def main(argv: list[str]) -> int:
                 continue
 
             if curr_read_ops or curr_write_ops:
-                row: dict[str, str] = {
+                row: dict[str, str | ColoredOps] = {
                     "Start": prev_timestamp.isoformat(),
                     "End": curr_timestamp.isoformat(),
-                    "ReadOpsTime": human_ops_time(curr_read_time, curr_read_ops),
+                    "ReadOpsTime": format_ops_time(curr_read_time, curr_read_ops),
                     "ReadMiBpS": bytes_to_megabytes(curr_read / curr_timedelta),
-                    "WriteOpsTime": human_ops_time(curr_write_time, curr_write_ops),
+                    "WriteOpsTime": format_ops_time(curr_write_time, curr_write_ops),
                     "WriteMiBpS": bytes_to_megabytes(curr_write / curr_timedelta),
-                    "OtherOpsTime": human_ops_time(curr_other_time, curr_other_ops),
+                    "OtherOpsTime": format_ops_time(curr_other_time, curr_other_ops),
                     "MountPoints": key,
                 }
 
