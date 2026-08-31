@@ -8,7 +8,7 @@ import re
 import string
 import sys
 from pathlib import Path
-from typing import NoReturn, TypedDict
+from typing import NoReturn, TypedDict, cast
 
 _RE_CN = re.compile(r"^\(cn=(.*)\)", re.IGNORECASE)
 
@@ -179,7 +179,8 @@ def new_display_name(rng: random.Random) -> str:
 def read_cache(path: Path, rng: random.Random) -> Cache:
     try:
         with path.open(encoding="utf-8") as handle:
-            return json.load(handle)
+            # FIXME: Validate input
+            return cast("Cache", json.load(handle))
     except FileNotFoundError:
         cache: Cache = {"users": {}, "groups": {}}
         display_names: set[str] = set()

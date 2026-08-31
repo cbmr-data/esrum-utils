@@ -51,3 +51,7 @@ ignore = [
   "S101",  # assert -- Use of assert detected
   "S108",  # hardcoded-temp-file -- Probable insecure usage of temporary file or dir
 ]
+
+"noxfile.py" = [
+  "INP001",  # implicit-namespace-package
+]

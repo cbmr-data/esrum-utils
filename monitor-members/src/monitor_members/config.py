@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from pathlib import Path
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, TypeVar, cast
 
 import tomli
 from koda import Just, Maybe, nothing
@@ -79,21 +79,23 @@ class Config:
 
 def custom_resolver(annotations: type[ModelType]) -> Validator[ModelType]:
     if dataclasses.is_dataclass(annotations):
-        return DataclassValidator(
+        validator = DataclassValidator(
             annotations,
             fail_on_unknown_keys=True,
             typehint_resolver=custom_resolver,
         )
 
+        return cast("Validator[ModelType]", validator)
+
     validator = get_typehint_validator(annotations)
     if isinstance(validator, MapValidator) and validator.coerce is None:
         validator.coerce = coerce_none_to_dict
 
-    return validator  # pyright: ignore [reportUnknownVariableType,reportReturnType]
+    return validator
 
 
-@coercer(type(None), dict[Any, Any])
-def coerce_none_to_dict(val: object) -> Maybe[dict[Any, Any]]:
+@coercer(type(None), dict[object, object])
+def coerce_none_to_dict(val: object) -> Maybe[dict[object, object]]:
     if isinstance(val, dict):
         return Just(val)  # pyright: ignore[reportUnknownArgumentType]
     elif val is None:
