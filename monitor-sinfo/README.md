@@ -34,5 +34,5 @@ The script `sim-sinfo.py` is provided for simulating the output of `sinfo` for t
 # Initialize simulator with 13 nodes with random states
 uv run python3 sinfo-sim.py --init 13
 # Run monitor-sinfo.py using `sinfo-sim.py` instead of `sinfo`
-uv run python3 monitor-sinfo.py test.toml --dry-run --interval 0.1 --sinfo ./sinfo-sim.py
+uv run python3 monitor-sinfo test.toml --dry-run --interval 0.1 --sinfo ./sinfo-sim.py
 ```

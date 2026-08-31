@@ -1,0 +1,9 @@
+# Listen with `nc -kl localhost 12345`
+
+smtp_server = "smtp:localhost:12345"
+
+email_recipients = [
+    # "abc123@sund.ku.dk"
+]
+
+slack_webhooks = ["http://localhost:12345"]

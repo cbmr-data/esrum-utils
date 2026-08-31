@@ -1,2 +1,4 @@
 *.toml
 *.json
+!localhost.toml
+!pyproject.toml
