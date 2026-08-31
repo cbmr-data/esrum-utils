@@ -63,7 +63,7 @@ def human_ops_time(ms: float, ops: int) -> str:
 
 
 def timestamp() -> datetime.datetime:
-    return datetime.datetime.now().replace(microsecond=0)  # noqa: DTZ005
+    return datetime.datetime.now().replace(microsecond=0)
 
 
 class Snapshot(NamedTuple):
