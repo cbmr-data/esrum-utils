@@ -6,17 +6,10 @@ In addition, the script may look for processes matching regular expressions, and
 
 ## Execution
 
-It is recommended to use [uv](https://docs.astral.sh/uv) to run this script:
+It is recommended to use [uv](https://docs.astral.sh/uv) to install/run this script:
 
 ```bash
-uv run ./monitor-stats.py config.toml
-```
-
-Requirements are listed in the header of the `./monitor-stats.py` file can be exported via `uv export` and used to create a virtual environment, e.g.
-
-```bash
-uv venv
-uv export --script monitor-stats.py | uv pip sync -
+uv run monitor-stats config.toml
 ```
 
 ## Configuration
