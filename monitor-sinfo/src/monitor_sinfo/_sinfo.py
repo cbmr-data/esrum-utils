@@ -9,9 +9,9 @@ import subprocess
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import override
 
 from koda_validate import DataclassValidator, Valid
-from typing_extensions import override
 
 from monitor_sinfo._utilities import abort
 

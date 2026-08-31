@@ -7,10 +7,9 @@ import logging
 import subprocess
 import sys
 from datetime import datetime
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, override
 
 import requests
-from typing_extensions import override
 
 from monitor_sinfo._cli import Args
 from monitor_sinfo._config import Config

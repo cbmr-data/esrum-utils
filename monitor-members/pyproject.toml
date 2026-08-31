@@ -2,16 +2,14 @@
 name = "monitor-members"
 dynamic = ["version"]
 
-requires-python = ">=3.11.0"
+requires-python = ">=3.12"
 dependencies = [
   "coloredlogs~=15.0.1",
   "koda-validate~=4.2.0",
   "requests~=2.33.0",
-  "sqlalchemy[mypy]~=2.0.35",
+  "sqlalchemy~=2.0.35",
   "tomli~=2.0.2",
   "typed-argparse~=0.3.1",
-  "types-requests>=2.33.0.20260712",
-  "typing_extensions>=4.0",
 ]
 
 [project.scripts]
@@ -21,6 +19,7 @@ monitor_members = "monitor_members.__main__:main_w"
 dev = [
   "nox>=2024.10.9",
   "ruff>=0.16.5",
+  "types-requests>=2.33.0.20260712",
   "zuban>=0.9.2",
 ]
 
