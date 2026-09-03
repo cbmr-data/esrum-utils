@@ -60,11 +60,13 @@ def parse_args(argv: list[str]) -> Args:
     parser.add_argument(
         "--dry-run",
         action="store_true",
+        default=False,
         help="Log updates that would be sent instead of sending them",
     )
     parser.add_argument(
         "--log-level",
         type=str.upper,
+        default="INFO",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
         help="Verbosity level for console logging",
     )
@@ -79,6 +81,7 @@ def parse_args(argv: list[str]) -> Args:
         "--loop",
         metavar="S",
         type=float,
+        default=None,
         help="Check for updates every S seconds, instead of exiting immediately",
     )
 
