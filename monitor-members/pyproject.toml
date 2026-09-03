@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-monitor_members = "monitor_members.__main__:main_w"
+monitor-members = "monitor_members.__main__:main_w"
 
 [dependency-groups]
 dev = [
