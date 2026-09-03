@@ -22,7 +22,7 @@ class Args:
     verbose: bool
     dry_run: bool
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"]
-    loop: int | None
+    loop: float | None
     slack_timeout: float
 
 
