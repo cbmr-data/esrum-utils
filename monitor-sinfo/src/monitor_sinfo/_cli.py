@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import functools
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PosixPath
 from typing import Literal
 
 import colorlog
@@ -16,8 +16,8 @@ from monitor_sinfo._utilities import abort
 
 @dataclass
 class Args:
-    config: Path
-    state: Path
+    config: PosixPath
+    state: PosixPath
     sinfo: str
     verbose: bool
     dry_run: bool
@@ -85,7 +85,7 @@ def parse_args(argv: list[str]) -> Args:
     validator = DataclassValidator(Args)
     result = validator(vars(parser.parse_args(argv)))
     if not isinstance(result, Valid):
-        abort("Error parsing TOML file: %s", result.err_type)
+        abort("Error validating command-line arguments: %s", result.err_type)
 
     return result.val
 
