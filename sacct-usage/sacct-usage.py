@@ -50,9 +50,13 @@ def run_command(command: list[str]) -> str | None:
 def parse_slurm_output(text: str) -> Iterator[dict[str, str]]:
     lines = text.split("\n")
     header = lines[0].rstrip().split("|")
+
+    # the last column is used for user-specified names, which may themselves contain '|'
+    maxsplit = len(header) - 1
+
     for line in lines[1:]:
         if line := line.strip():
-            yield dict(zip(header, line.split("|"), strict=True))
+            yield dict(zip(header, line.split("|", maxsplit), strict=True))
 
 
 def values_or_nan(values: Iterable[float]) -> list[float]:
