@@ -6,7 +6,7 @@ from typing import Literal
 import typed_argparse as tap
 
 from monitor_members.common import main_func, parse_duration, setup_logging, which
-from monitor_members.config import Config
+from monitor_members.config import Config, ConfigError
 from monitor_members.database import Database
 from monitor_members.groups import GroupType, collect_groups
 from monitor_members.kerberos import Kerberos
@@ -28,14 +28,6 @@ class Args(tap.TypedArgs):
         default=0.0,
         help="Repeat monitoring steps every N seconds, if value is greater than 0. "
         "Accepts units 'd', 'h', 'm', and 's', for days, hours, minutes and seconds",
-    )
-
-    ####################################################################################
-    # Notifications
-
-    slack: str = tap.arg(
-        default="default",
-        help="Name of Slack webhook URL to use",
     )
 
     ####################################################################################
@@ -91,12 +83,14 @@ def main(args: Args) -> int:
         ldapsearch_exe=args.ldapsearch_exe,
     )
 
-    if args.slack not in conf.slack.urls:
-        log.critical("Slack webhook %r not found in config file", args.slack)
+    try:
+        webhooks = conf.slack.gather_webhooks()
+    except ConfigError as error:
+        log.critical("Error reading webhook webhook urls: %s", error)
         return 1
 
     notifier = SlackNotifier(
-        webhooks=[conf.slack.urls[args.slack]],
+        webhooks=webhooks,
         timeout=60,
         verbose=True,
     )

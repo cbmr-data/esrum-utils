@@ -365,11 +365,13 @@ def setup_notifications(args: Args) -> list[Notifier]:
             )
         )
 
-    if config.slack_webhooks:
-        logger.debug("adding slack webhook %s", config.slack_webhooks)
+    if webhooks := config.slack.gather_webhooks():
+        for url in webhooks:
+            logger.debug("adding slack webhook %r", url)
+
         notifiers.append(
             SlackNotifier(
-                webhooks=config.slack_webhooks,
+                webhooks=webhooks,
                 timeout=args.slack_timeout,
                 verbose=args.verbose,
             )

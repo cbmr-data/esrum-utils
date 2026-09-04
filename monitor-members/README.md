@@ -25,13 +25,18 @@ database = "database.sqlite3"
 username = "abc123@UNICPH.DOMAIN"
 keytab = "abc123.keytab"
 
-# Zero or more webhooks; used by both the `ldap` and the `sacct` command
-[slack.urls]
+# Settings related to Slack notification
+# Zero or more of these settings may be enabled
+[slack]
 
-default = "https://hooks.slack.com/services/..."
-other-hook = "https://hooks.slack.com/services/..."
-# Webhook for testing, see below
-localhost = "http://localhost:8000"
+# Optional URL to Slack webhook
+# webhook_url = "https://hooks.slack.com/services/..."
+
+# Optional name of environment variable containing Slack webhook URL
+# webhook_env = "NAME_OF_VARIABLE"
+
+# Optional path to file containing a single Slack webhook URL
+# webhook_path = "/path/to/webhook.txt"
 
 # Settings relating to the `ldap` monitoring command
 [ldap]

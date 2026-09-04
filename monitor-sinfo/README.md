@@ -13,17 +13,23 @@ uv run python3 ./monitor-sinfo.py deploy.toml
 The monitoring script expects a `toml` file containing SMTP servers/email address for email notifications and/or webhook URLs for Slack notifications. The format is as follow:
 
 ```toml
-smtp-server = "smtp.example.com"
+smtp_server = "smtp.example.com"
 
 # Zero or more email addresses
-email-recipients = [
+email_recipients = [
     "abc123@sund.ku.dk",
 ]
 
-# Zero or more webhooks
-slack-webhooks = [
-    "https://hooks.slack.com/services/etc",
-]
+[slack]
+
+# Optional URL to Slack webhook
+# webhook_url = "https://hooks.slack.com/services/..."
+
+# Optional name of environment variable containing Slack webhook URL
+# webhook_env = "NAME_OF_VARIABLE"
+
+# Optional path to file containing a single Slack webhook URL
+# webhook_path = "/path/to/webhook.txt"
 ```
 
 ## Testing

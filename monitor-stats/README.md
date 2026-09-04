@@ -17,14 +17,23 @@ uv run monitor-stats config.toml
 The monitoring script expects a `toml` file containing webhook URLs for Slack notifications and a list of regular exprssions. The format is as follow:
 
 ```toml
-
-# Zero or more webhooks
-slack-webhooks = [
-    "https://hooks.slack.com/services/...",
-]
-
+# Emit warnings about processes matching these regular expressions
 process_blacklist = [
     "\\brg\\b.+--follow",
     "\\brsync\\b",
 ]
+
+# Do not warn about processes matching these regular expressions
+process_whitelist = ["^srun"]
+
+[slack]
+
+# Optional URL to Slack webhook
+# webhook_url = "https://hooks.slack.com/services/..."
+
+# Optional name of environment variable containing Slack webhook URL
+# webhook_env = "NAME_OF_VARIABLE"
+
+# Optional path to file containing a single Slack webhook URL
+# webhook_path = "/path/to/webhook.txt"
 ```

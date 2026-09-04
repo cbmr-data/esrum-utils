@@ -3,7 +3,8 @@
 smtp_server = "smtp:localhost:12345"
 
 email_recipients = [
-    # "abc123@sund.ku.dk"
+  # "abc123@sund.ku.dk"
 ]
 
-slack_webhooks = ["http://localhost:12345"]
+[slack]
+webhook_url = "http://localhost:8080"

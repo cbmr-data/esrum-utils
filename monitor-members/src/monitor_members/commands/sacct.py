@@ -15,7 +15,7 @@ from monitor_members.common import (
     setup_logging,
     which,
 )
-from monitor_members.config import Config
+from monitor_members.config import Config, ConfigError
 from monitor_members.kerberos import Kerberos
 from monitor_members.ldap import LDAP
 from monitor_members.sacctmgr import Sacctmgr
@@ -136,12 +136,14 @@ def main(args: Args) -> int:
         ldapsearch_exe=args.ldapsearch_exe,
     )
 
-    if args.slack not in conf.slack.urls:
-        log.critical("Slack webhook %r not found in config file", args.slack)
+    try:
+        webhooks = conf.slack.gather_webhooks()
+    except ConfigError as error:
+        log.critical("Error reading webhook webhook urls: %s", error)
         return 1
 
     notifier = SlackNotifier(
-        webhooks=[conf.slack.urls[args.slack]],
+        webhooks=webhooks,
         timeout=60,
         verbose=True,
     )

@@ -32,7 +32,7 @@ def main(argv: list[str] | None = None) -> Never:
     config = Config.load(args.config)
 
     notifier = SlackNotifier(
-        webhooks=config.slack_webhooks,
+        webhooks=config.slack.gather_webhooks(),
         timeout=args.slack_timeout,
         host=socket.gethostname(),
     )
