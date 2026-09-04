@@ -7,7 +7,7 @@ dependencies = [
   "coloredlogs~=15.0.1",
   "koda-validate~=4.2.0",
   "requests~=2.33.0",
-  "sqlalchemy~=2.0.35",
+  "sqlalchemy~=2.0.51",
   "tomli~=2.0.2",
   "typed-argparse~=0.3.1",
 ]
