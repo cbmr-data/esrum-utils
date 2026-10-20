@@ -17,7 +17,11 @@ from typing import Literal, NoReturn
 
 @dataclass
 class Statistics:
-    cpu_hours: float = 0
+    # Hours of reserved CPUs on CPU (compute) nodes
+    cpu_node_hours: float = 0
+    # Hours of reserved CPUs on GPU nodes
+    gpu_node_hours: float = 0
+    # Hours of reserved GPUs
     gpu_hours: float = 0
     jobs: set[int] = field(default_factory=set)
     users: set[str] = field(default_factory=set)
@@ -134,9 +138,14 @@ def read_user_groups(filepath: Path | None) -> dict[str, str] | None:
     return None
 
 
-def parse_sacct_output(text: str, *, source: str) -> list[tuple[date, Statistics]]:
+def parse_sacct_output(
+    text: str,
+    *,
+    source: str,
+    flatten: bool,
+) -> list[tuple[date, Statistics]]:
     items: list[tuple[date, Statistics]] = []
-    columns = ("User", "JobID", "Start", "End", "ReqCPUS", "Partition")
+    columns = ("User", "JobID", "Start", "End", "ReqCPUS", "Partition", "AllocTRES")
     for row in parse_xsv(text.splitlines(), source=source, columns=columns, sep="|"):
         if not row["User"]:
             continue  # Ignore sub-tasks; -X should normally omit those
@@ -147,20 +156,31 @@ def parse_sacct_output(text: str, *, source: str) -> list[tuple[date, Statistics
         # Ignore ongoing or never started jobs
         if starttime is not None and endtime is not None:
             for day, hours in parse_range(starttime, endtime):
-                cpu_hours = hours * int(row["ReqCPUS"])
+                node_hours = hours * int(row["ReqCPUS"])
+                cpu_node_hours = 0
+                gpu_node_hours = 0
                 gpu_hours = 0
 
-                if row["Partition"] != "standardqueue":
-                    cpu_hours, gpu_hours = gpu_hours, cpu_hours
+                if row["Partition"] == "standardqueue":
+                    cpu_node_hours = node_hours
+                else:
+                    gpu_node_hours = node_hours
+
+                    for key in row["AllocTRES"].split(","):
+                        if key.startswith("gres/gpu="):
+                            key, value = key.split("=")
+                            gpu_hours = hours * int(value)
+                            break
 
                 items.append(
                     (
                         day,
                         Statistics(
-                            cpu_hours=cpu_hours,
+                            cpu_node_hours=cpu_node_hours,
+                            gpu_node_hours=gpu_node_hours,
                             gpu_hours=gpu_hours,
                             jobs={int(row["JobID"])},
-                            users={row["User"].lower()},
+                            users={"everyone"} if flatten else {row["User"].lower()},
                         ),
                     )
                 )
@@ -174,7 +194,7 @@ def run_sacct(executable: Path, *, starttime: str) -> str:
             executable,
             "-X",
             "--parsable2",
-            "--format=User,JobID,ReqCPUs,Start,End,Partition",
+            "--format=User,JobID,ReqCPUs,Start,End,Partition,AllocTRES",
             "--allusers",
             "--starttime",
             starttime,
@@ -245,7 +265,8 @@ def print_summary(
             name = user_groups.get(name, "Unknown")
 
         totals = summary[(*resolution(timestamp), name)]
-        totals.cpu_hours += stats.cpu_hours
+        totals.cpu_node_hours += stats.cpu_node_hours
+        totals.gpu_node_hours += stats.gpu_node_hours
         totals.gpu_hours += stats.gpu_hours
         totals.jobs.update(stats.jobs)
         totals.users.update(stats.users)
@@ -255,7 +276,12 @@ def print_summary(
         row = list(key)
         if user_groups:
             row.append(len(stats.users))
-        row += [len(stats.jobs), f"{stats.cpu_hours:.1f}", f"{stats.gpu_hours:.1f}"]
+        row += [
+            len(stats.jobs),
+            f"{stats.cpu_node_hours:.1f}",
+            f"{stats.gpu_node_hours:.1f}",
+            f"{stats.gpu_hours:.1f}",
+        ]
 
         print(*row, sep="\t")
 
@@ -275,6 +301,7 @@ def print_report(
         "Jobs",
         "CPUNodeHours",
         "GPUNodeHours",
+        "GPUHours",
     ]
 
     summary: dict[tuple[str | int, ...], Statistics] = defaultdict(Statistics)
@@ -283,7 +310,8 @@ def print_report(
         group = user_groups[name]
 
         totals = summary[(*resolution(timestamp), group, name)]
-        totals.cpu_hours += stats.cpu_hours
+        totals.cpu_node_hours += stats.cpu_node_hours
+        totals.gpu_node_hours += stats.gpu_node_hours
         totals.gpu_hours += stats.gpu_hours
         totals.jobs.update(stats.jobs)
         totals.users.update(stats.users)
@@ -293,7 +321,8 @@ def print_report(
         print(
             *key,
             len(stats.jobs),
-            f"{stats.cpu_hours:.1f}",
+            f"{stats.cpu_node_hours:.1f}",
+            f"{stats.gpu_node_hours:.1f}",
             f"{stats.gpu_hours:.1f}",
             sep="\t",
         )
@@ -376,6 +405,12 @@ def parse_args(argv: list[str]) -> Args:
         default="month",
         help="Aggregate summaries by this time-unit",
     )
+    parser.add_argument(
+        "--totals",
+        default=False,
+        action="store_true",
+        help="Show totals, not user/group values",
+    )
 
     return parser.parse_args(argv, namespace=Args())
 
@@ -401,7 +436,11 @@ def main(argv: list[str]) -> int:
         if args.mode == "collect":
             return 0
 
-    sacct_output = parse_sacct_output(raw_sacct_output, source=raw_sacct_source)
+    sacct_output = parse_sacct_output(
+        raw_sacct_output,
+        source=raw_sacct_source,
+        flatten=args.totals,
+    )
     user_groups = read_user_groups(args.user_groups)
 
     if user_groups is not None:
@@ -415,7 +454,10 @@ def main(argv: list[str]) -> int:
 
     if args.mode == "report":
         if user_groups is None:
-            abort("--user-groups required for reports")
+            if args.totals:
+                user_groups = {"everyone": "everyone"}
+            else:
+                abort("--user-groups required for reports")
 
         return print_report(
             sacct_output=sacct_output,
