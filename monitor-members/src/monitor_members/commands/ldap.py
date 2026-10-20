@@ -101,28 +101,28 @@ def main(args: Args) -> int:
         kinit_exe=args.kinit_exe,
     )
 
-    with Database(database=conf.database, ldap=ldap, groups=groups) as database:
-        # display names are assumed to be unchanging over the runtime of the script
-        displaynames: dict[str, str | None] = {}
-
+    with Database(
+        ldap=ldap,
+        database_url=conf.database_url,
+        groups=groups,
+        user_queries=conf.ldap.additional_user_queries,
+    ) as database:
         for _ in kerb.authenticated_loop(
             interval=args.interval,
             notifier=notifier,
             what="Monitoring LDAP group members",
         ):
-            if not database.update_ldap_groups():
+            if not database.update():
                 log.error("could not update group memberships")
                 return 1
 
-            if changes := database.unreported_updates():
-                for change in changes:
-                    if change.user not in displaynames:
-                        displaynames[change.user] = ldap.display_name(change.user)
-
+            if changes := database.unreported_updates(
+                primary_group=conf.ldap.primary_group
+            ):
                 report_sent = notifier.send_ldap_notification(
-                    sensitive_users=conf.ldap.sensitive_users,
-                    displaynames=displaynames,
                     changes=changes,
+                    sensitive_users=conf.ldap.sensitive_users,
+                    primary_group=conf.ldap.primary_group,
                 )
 
                 database.add_report(kind=ReportKind.LDAP, success=report_sent)

@@ -161,11 +161,12 @@ def main(args: Args) -> int:
         notifier=notifier,
         what="Monitoring SACCT members",
     ):
-        ldap_members = ldap.members(sacct.ldap_group)
-        if ldap_members is None:
+        groups = ldap.get_groups([sacct.ldap_group])
+        if not groups:
             log.error("failed to get members of LDAP group %r", sacct.ldap_group)
             return 1
 
+        ldap_members = set(groups[sacct.ldap_group.lower()].members)
         sacct_members = manager.get_associations()
         if sacct_members is None:
             log.error("failed to get sacct members")

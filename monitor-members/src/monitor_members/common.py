@@ -5,17 +5,15 @@ import shlex
 import shutil
 import subprocess
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Callable, Literal, NoReturn, TypeVar
+from typing import Literal, NoReturn
 
-import coloredlogs
-
-T = TypeVar("T")
+import esrum_shared.logging
 
 
-def main_func(func: Callable[[T], int]) -> Callable[[T], None]:
+def main_func[T](func: Callable[[T], int]) -> Callable[[T], None]:
     # Ensure that tap finds the correct annotations
     @wraps(func)
     def _wrapper(arg: T) -> None:
@@ -63,11 +61,7 @@ def setup_logging(
     log_level: Literal["ERROR", "WARNING", "INFO", "DEBUG"],
     log_sql: bool = False,
 ) -> logging.Logger:
-    coloredlogs.install(
-        fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
-        level=log_level,
-        milliseconds=True,
-    )
+    esrum_shared.logging.install(log_level)
 
     if log_sql:
         # Echo SQL alchemy commands to log
@@ -138,7 +132,7 @@ def pretty_list(items: Sequence[object]) -> str:
     return "".join(str(v) for v in pretty_list_t(items))
 
 
-def pretty_list_t(items: Sequence[T]) -> Iterator[str | T]:
+def pretty_list_t[T](items: Sequence[T]) -> Iterator[str | T]:
     if len(items) == 0:
         yield "N/A"
     elif len(items) == 1:

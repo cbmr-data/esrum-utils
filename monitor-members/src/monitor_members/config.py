@@ -4,7 +4,7 @@ import dataclasses
 import logging
 import os
 from pathlib import Path
-from typing import Annotated, TypeVar, cast
+from typing import cast
 
 import tomli
 from koda import Just, Maybe, nothing
@@ -18,8 +18,6 @@ from koda_validate import (
     coercer,
 )
 from koda_validate.typehints import get_typehint_validator
-
-ModelType = TypeVar("ModelType")
 
 _LOG = logging.getLogger("config")
 
@@ -80,10 +78,14 @@ class Kerberos:
 class LDAP:
     uri: str
     searchbase: str
+    primary_group: str | None = None
     sensitive_groups: list[str] = dataclasses.field(default_factory=list[str])
     mandatory_groups: list[str] = dataclasses.field(default_factory=list[str])
     groups: list[str] = dataclasses.field(default_factory=list[str])
     sensitive_users: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
+
+    # SQL queries returning additional users to monitor
+    additional_user_queries: list[str] = dataclasses.field(default_factory=list[str])
 
 
 @dataclasses.dataclass
@@ -100,8 +102,8 @@ class Sacct:
 
 @dataclasses.dataclass
 class Config:
-    database: Annotated[Path, PathValidator()]
     ldap: LDAP
+    database_url: str | None = None
     kerberos: Kerberos = dataclasses.field(default_factory=Kerberos)
     slack: Slack = dataclasses.field(default_factory=Slack)
     sacct: Sacct | None = dataclasses.field(default=None)
@@ -119,7 +121,7 @@ class Config:
         return db.val
 
 
-def custom_resolver(annotations: type[ModelType]) -> Validator[ModelType]:
+def custom_resolver[ModelType](annotations: type[ModelType]) -> Validator[ModelType]:
     if dataclasses.is_dataclass(annotations):
         validator = DataclassValidator(
             annotations,

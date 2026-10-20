@@ -1,0 +1,82 @@
+# Optional database URL
+# database_url = "sqlite+pysqlite:////path/to/database.sqlite3"
+
+[kerberos]
+username = "abc123@UNICPH.DOMAIN"
+keytab = "path/to/kerberos.keytab"
+
+[slack]
+# webhook_url = "https://hooks.slack.com/services/..."
+# webhook_env = "SLACK_WEBHOOK_URL"
+# webhook_file = "/path/to/file/containing/url.txt"
+
+[ldap]
+uri = "ldap:///dc%3Dunicph%2Cdc%3Ddomain"
+searchbase = "dc=unicph,dc=domain"
+
+# Groups for which additions and removals should trigger a warning
+sensitive_groups = [
+  "other-group-3",
+]
+
+# Membership to this group is required for access to any other group
+primary_group = "primary-group"
+
+# Groups for which removals should trigger a warning
+mandatory_groups = [
+  "primary-group",
+  "secondary-group",
+]
+
+# List of regular groups to monitor; may overlap with the above
+groups = [
+  "other-group-1",
+  "other-group-2",
+  "other-group-3",
+  "other-group-4",
+  "primary-group",
+  "secondary-group",
+]
+
+# Monitor profile changes for the users returned by these queries. The queries
+# must return exactly one value (username) per row. The usernames may overlap
+# with the members of the above groups. Duplicate entries are filtered.
+additional_user_queries = [
+#    "SELECT [username] FROM [some_other_table];",
+]
+
+
+[ldap.sensitive_users]
+"A*" = "USER whose name starts with A!"
+"B*" = "USER whose name starts with B!"
+# Use <@SLACKID> to @ a specific slack user
+"C*" = "USER whose name starts with C: <@SLACKID>"
+
+[sacct]
+ldap_group = "primary-group"
+cluster = "cluster"
+account = "cbmr"
+
+# Command to be executed when a new user is added to the monitored group
+add_member = [
+  "echo",
+  "sacctmgr",
+  "-i",
+  "create",
+  "user",
+  "name={user}",
+  "cluster={cluster}",
+  "account={account}",
+]
+
+# Command to be executed when a new user is removed from the monitored group
+remove_member = [
+  "echo",
+  "sacctmgr",
+  "-i",
+  "delete",
+  "user",
+  "name={user}",
+  "cluster={cluster}",
+  "account={account}",
+]
