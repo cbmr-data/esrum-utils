@@ -8,7 +8,7 @@ repos:
       - id: check-yaml
         args: [--allow-multiple-documents]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e05c5c0818279e5ac248ac9e954431ba58865e61 # v0.15.7
+    rev: 38bfb07c0c64c304f47eb52090f8288150c77730 # v0.17.1
     hooks:
       - id: ruff-check
       - id: ruff-format
