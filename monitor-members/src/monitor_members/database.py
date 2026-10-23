@@ -316,6 +316,7 @@ class Database:
                     item = ProfileChange()
                     any_changes = False
                     for key, old, new in (
+                        ("Account status", prev.status, next.status),
                         ("display_name", prev.display_name, next.display_name),
                         ("department", prev.department, next.department),
                         ("division", prev.division, next.division),
@@ -357,18 +358,20 @@ class Database:
                 or profile.department != ldap_user.department
                 or profile.division != ldap_user.division
                 or profile.title != ldap_user.title
+                or profile.active != ldap_user.active
             ):
                 if profile is not None:
                     profile.mark_as_removed()
                     session.add(profile)
                     self._log.debug(
                         "Marking old profile for %r: display_name=%r, "
-                        "department=%r, division=%r, title=%r",
+                        "department=%r, division=%r, title=%r, active=%r",
                         user.username,
                         profile.display_name,
                         profile.department,
                         profile.division,
                         profile.title,
+                        profile.active,
                     )
 
                 profile = Profile.new(
@@ -377,16 +380,18 @@ class Database:
                     department=ldap_user.department,
                     division=ldap_user.division,
                     title=ldap_user.title,
+                    active=ldap_user.active,
                 )
 
                 self._log.debug(
                     "Adding new profile for %r: display_name=%r, "
-                    "department=%r, division=%r, title=%r",
+                    "department=%r, division=%r, title=%r, active=%r",
                     user.username,
                     profile.display_name,
                     profile.department,
                     profile.division,
                     profile.title,
+                    profile.active,
                 )
 
                 session.add(profile)

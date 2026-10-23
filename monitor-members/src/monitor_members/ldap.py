@@ -16,6 +16,7 @@ class LDAPUser:
     department: str
     division: str
     title: str
+    active: bool | None
 
 
 @dataclasses.dataclass
@@ -66,6 +67,7 @@ class LDAP:
                 department=self._get_single_value(cn, "department", result),
                 division=self._get_single_value(cn, "division", result),
                 title=self._get_single_value(cn, "title", result),
+                active=self._get_is_active(result),
             )
 
         return results
@@ -236,3 +238,17 @@ class LDAP:
             return values
         else:
             return []
+
+    def _get_is_active(self, properties: dict[str, str | list[str]]) -> bool | None:
+        active: bool | None = None
+        dn = properties.get("dn")
+        if isinstance(dn, str):
+            values = dn.split(",")
+            if "OU=Active" in values:
+                active = True
+            elif "OU=Inactive" in values:
+                active = False
+        elif dn is not None:
+            self._log.warning("invalid 'dn' value %r", dn)
+
+        return active

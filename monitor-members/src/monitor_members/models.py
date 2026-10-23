@@ -7,6 +7,7 @@ from typing import ClassVar
 
 import sqlalchemy
 from sqlalchemy import (
+    Boolean,
     ColumnExpressionArgument,
     DateTime,
     Dialect,
@@ -122,6 +123,18 @@ class Profile(_SnapshotModel, Base):
 
     title: Mapped[str] = mapped_column(Text)
 
+    # Account status: active/inactive/unknown
+    active: Mapped[bool | None] = mapped_column(Boolean, default=None)
+
+    @property
+    def status(self) -> str:
+        if self.active:
+            return "Active"
+        elif self.active is None:
+            return ""
+        else:
+            return "Inactive"
+
     @staticmethod
     def new(
         *,
@@ -130,6 +143,7 @@ class Profile(_SnapshotModel, Base):
         department: str,
         division: str,
         title: str,
+        active: bool | None,
     ) -> Profile:
         return Profile(
             user_id=user.id,
@@ -137,6 +151,7 @@ class Profile(_SnapshotModel, Base):
             department=department,
             division=division,
             title=title,
+            active=active,
             added=timestamp(),
             removed=None,
         )

@@ -211,6 +211,7 @@ class User(TypedDict):
     department: str
     division: str
     title: str
+    active: bool | None
 
 
 class Cache(TypedDict):
@@ -248,6 +249,28 @@ def new_display_name(rng: random.Random) -> str:
     return f"{rng.choice(FIRST_NAMES)} {rng.choice(LAST_NAMES)}"
 
 
+def new_active(rng: random.Random) -> bool | None:
+    r = rng.random()
+    if r < 0.1:
+        new = None
+    else:
+        new = r < 0.55
+
+    return new
+
+
+def get_dn_string(cn: str, user: User) -> str:
+    # FIXME: `get` for backwards compatibility; remove later
+    if user.get("active"):
+        active = "Active"
+    elif user.get("active") is None:
+        active = "Inactive"
+    else:
+        active = "Other"
+
+    return f"CN={cn},OU={active},FOO=bar"
+
+
 def read_cache(path: Path, rng: random.Random) -> Cache:
     try:
         with path.open(encoding="utf-8") as handle:
@@ -272,6 +295,7 @@ def read_cache(path: Path, rng: random.Random) -> Cache:
                 department=new_department(rng),
                 division=new_division(rng),
                 title=new_title(rng),
+                active=new_active(rng),
             )
 
         return cache
@@ -293,6 +317,10 @@ def update_user(user: User, *, rng: random.Random) -> None:
 
     if rng.random() <= _CHANCE_USER_MODIFY:
         user["title"] = new_title(rng)
+
+    # Likely to return the same value, so just do it more often...
+    if rng.random() <= _CHANCE_USER_MODIFY * 2:
+        user["active"] = new_active(rng)
 
 
 def update_group(
@@ -380,7 +408,7 @@ def main(argv: list[str]) -> int:
         if _RE_KUID.match(key):
             if user := cache["users"].get(key):
                 update_user(user, rng=rng)
-                _print_field("dn", f"CN={key},FOO=bar")
+                _print_field("dn", get_dn_string(key, user))
                 _print_optional_field("cn", key)
                 _print_optional_field("displayName", user["display_name"])
                 _print_optional_field("department", user["department"])

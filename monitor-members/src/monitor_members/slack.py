@@ -240,7 +240,8 @@ class SlackNotifier:
 
                 text: list[Text | Emoji | User] = [
                     Text(key.title(), bold=(values.old != values.new)),
-                    Text(f": {values.old}"),
+                    Text(": "),
+                    Text(values.old),
                 ]
 
                 if values.old != values.new:
