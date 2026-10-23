@@ -43,7 +43,7 @@ class LDAP:
         ldapsearch_exe: str = "ldapsearch",
         uri: str,
         searchbase: str,
-        batch_size: int = 10,
+        batch_size: int = 50,
     ) -> None:
         self._log = logging.getLogger("ldap")
         self._uri = uri
