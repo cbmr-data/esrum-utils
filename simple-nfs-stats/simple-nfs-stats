@@ -312,6 +312,7 @@ def main(argv: list[str]) -> int:
     header = [
         "Start",
         "End",
+        "TotalOps",
         "ReadMiBpS",
         "ReadOpsTime",
         "WriteMiBpS",
@@ -374,6 +375,8 @@ def main(argv: list[str]) -> int:
             curr_write_ops = curr_stats.write_total_ops - prev_stats.write_total_ops
             curr_other_ops = curr_stats.other_total_ops - prev_stats.other_total_ops
 
+            total_ops = curr_read_ops + curr_write_ops + curr_other_ops
+
             if (
                 args.min_ops_time > 0
                 and max(
@@ -389,6 +392,7 @@ def main(argv: list[str]) -> int:
                 row: dict[str, str | ColoredOps] = {
                     "Start": prev_timestamp.isoformat(),
                     "End": curr_timestamp.isoformat(),
+                    "TotalOps": str(total_ops),
                     "ReadOpsTime": format_ops_time(curr_read_time, curr_read_ops),
                     "ReadMiBpS": bytes_to_megabytes(curr_read / curr_timedelta),
                     "WriteOpsTime": format_ops_time(curr_write_time, curr_write_ops),
