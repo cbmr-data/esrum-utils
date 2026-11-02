@@ -1,4 +1,4 @@
-#!/usr/bin/python3.11
+#!/usr/bin/python3.12
 # pyright: strict
 from __future__ import annotations
 

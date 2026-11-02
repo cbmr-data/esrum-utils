@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.9
+#!/usr/bin/env python3.12
 # pyright: strict
 from __future__ import annotations
 
