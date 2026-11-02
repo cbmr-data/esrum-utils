@@ -292,14 +292,19 @@ class Database:
         session: sqlalchemy.orm.Session,
         since: datetime | None,
     ) -> dict[str, list[ProfileChange]]:
-        query = sqlalchemy.select(Profile)
-        if since is not None:
-            user_ids = (
-                sqlalchemy.select(Profile.user_id)
-                .where((Profile.added > since) | (Profile.removed > since))
-                .distinct()
+        # do not report additional users; these are passively monitored
+        if since is None:
+            query = sqlalchemy.select(Profile).where(
+                sqlalchemy.exists(1).where(Membership.user_id == Profile.user_id)
             )
-            query = query.where(Profile.user_id.in_(user_ids))
+        else:
+            query = sqlalchemy.select(Profile).where(
+                (Profile.added > since) | (Profile.removed > since),
+                sqlalchemy.exists(1).where(
+                    (Membership.user_id == Profile.user_id),
+                    (Membership.added > since) | (Membership.removed > since),
+                ),
+            )
 
         profiles: dict[User, list[Profile]] = defaultdict(list)
         for profile in session.scalars(query):
